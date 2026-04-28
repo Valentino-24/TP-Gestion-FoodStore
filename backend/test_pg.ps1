@@ -1,0 +1,1 @@
+.venv\Scripts\python -c "import psycopg2; print(psycopg2.__version__)"

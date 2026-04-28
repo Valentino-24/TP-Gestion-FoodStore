@@ -1,0 +1,14 @@
+fastapi[standard]
+uvicorn
+sqlmodel
+psycopg[binary]
+asyncpg
+pydantic
+pydantic-settings
+alembic
+passlib[bcrypt]
+python-jose
+slowapi
+mercadopago
+httpx
+email-validator
