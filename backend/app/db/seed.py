@@ -1,7 +1,14 @@
 """Database seed script for initial reference data.
 
 Uses SQLAlchemy sync engine to avoid encoding issues.
+Reads DATABASE_URL from .env via app config (converts async URL to sync).
 """
+
+import sys
+import os
+
+# Add parent directory to path so we can import app modules
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from sqlalchemy import create_engine, text
 
@@ -29,6 +36,15 @@ FORMAS_PAGO = [
 ]
 
 
+def get_sync_url(async_url: str) -> str:
+    """Convert an async database URL to a sync one.
+
+    Examples:
+        postgresql+asyncpg://... -> postgresql://...
+    """
+    return async_url.replace("postgresql+asyncpg", "postgresql")
+
+
 def create_tables(conn):
     """Create tables if they don't exist."""
     with conn.begin():
@@ -39,7 +55,7 @@ def create_tables(conn):
                 descripcion TEXT
             )
         """))
-        
+
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS estado_pedido (
                 id INTEGER PRIMARY KEY,
@@ -47,7 +63,7 @@ def create_tables(conn):
                 descripcion TEXT
             )
         """))
-        
+
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS forma_pago (
                 id INTEGER PRIMARY KEY,
@@ -92,33 +108,39 @@ def seed_formas_pago(conn):
 
 def run_seed():
     """Run all seeds."""
-    # Use sync SQLAlchemy engine with postgresql://
-    db_url = "postgresql://user:admin@localhost:5432/foodstore"
+    # Read DATABASE_URL from environment (same as app config uses)
+    from app.config import settings
+
+    db_url = get_sync_url(settings.DATABASE_URL)
     engine = create_engine(db_url)
-    
+
     try:
         # Create tables
-        create_tables(engine)
+        with engine.connect() as conn:
+            create_tables(conn)
         print("✓ Tables created")
-        
+
         # Seed data
-        seed_roles(engine)
+        with engine.connect() as conn:
+            seed_roles(conn)
         print("✓ Seeded roles")
-        
-        seed_estados_pedido(engine)
+
+        with engine.connect() as conn:
+            seed_estados_pedido(conn)
         print("✓ Seeded estados_pedido")
-        
-        seed_formas_pago(engine)
+
+        with engine.connect() as conn:
+            seed_formas_pago(conn)
         print("✓ Seeded formas_pago")
-        
+
         # Verify
         with engine.connect() as conn:
             result = conn.execute(text("SELECT id, nombre FROM rol ORDER BY id"))
             roles = result.fetchall()
             print(f"✓ Roles: {roles}")
-        
+
         print("\n✓ Seed completed successfully!")
-        
+
     finally:
         engine.dispose()
 

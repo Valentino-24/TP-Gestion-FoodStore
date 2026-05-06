@@ -1,14 +1,13 @@
 """Database connection and SQLModel configuration."""
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase
+from sqlmodel import SQLModel
 
 from app.config import settings
 
 
-class Base(DeclarativeBase):
-    """SQLAlchemy declarative base class."""
-    pass
+# Alias for backward compatibility — all models use SQLModel as base
+Base = SQLModel
 
 
 # Create async engine

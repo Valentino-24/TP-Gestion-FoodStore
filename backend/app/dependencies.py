@@ -1,92 +1,95 @@
 """FastAPI dependencies for authentication and authorization."""
 
 from typing import Annotated, AsyncGenerator, Optional
-from fastapi import Depends, HTTPException, status, Request
+
+from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.config import settings
-from app.database import AsyncSession
+from app.database import AsyncSession, async_session_maker, get_db
+from app.models.usuario import Usuario
 
 
 # OAuth2 scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_PREFIX}/auth/login")
 
 
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Dependency that provides a database session."""
-    from app.database import async_session_maker
-    async with async_session_maker() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
-
-
-# Type alias for database session
-DBSession = Annotated[AsyncSession, Depends(get_db)]
-
-
-# Current user dependency (placeholder - will be implemented in auth-system)
 async def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)],
-    db: DBSession,
-):
-    """Dependency to get the current authenticated user.
-    
-    This is a placeholder. Full implementation in auth-system change.
-    
+    db: AsyncSession = Depends(get_db),
+) -> Usuario:
+    """Decode JWT and return the authenticated user with roles.
+
     Args:
-        token: JWT token from Authorization header
-        db: Database session
-        
+        token: JWT token from Authorization header.
+        db: Database session.
+
     Returns:
-        User object (placeholder - type to be defined)
-        
+        Usuario object with roles loaded.
+
     Raises:
-        HTTPException: 401 if token is invalid
+        HTTPException 401 if token is invalid or user not found.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
+        detail="No se pudo validar las credenciales",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
+
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
-        user_id: str = payload.get("sub")
+        user_id: Optional[str] = payload.get("sub")
         if user_id is None:
             raise credentials_exception
     except JWTError:
         raise credentials_exception
-    
-    # TODO: Implement actual user lookup when Usuario model exists
-    # For now, return placeholder
-    return {"id": user_id, "email": "placeholder@email.com"}
+
+    # Look up user with roles
+    stmt = (
+        select(Usuario)
+        .where(Usuario.id == int(user_id), Usuario.eliminado_en.is_(None))
+        .options(selectinload(Usuario.roles))
+    )
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        raise credentials_exception
+
+    return user
 
 
-CurrentUser = Annotated[dict, Depends(get_current_user)]
+# Type alias for authenticated user dependency
+CurrentUser = Annotated[Usuario, Depends(get_current_user)]
 
 
 def require_role(allowed_roles: list[str]):
     """Dependency factory for role-based access control.
-    
+
     Args:
-        allowed_roles: List of role names that are allowed
-        
+        allowed_roles: List of role names that are allowed access.
+
     Returns:
-        Dependency function that checks user role
-        
+        Dependency function that checks user roles.
+
+    Raises:
+        HTTPException 403 if user lacks required roles.
+
     Example:
         @router.get("/admin")
         async def admin_only(user: CurrentUser = Depends(require_role(["ADMIN"]))):
             ...
     """
-    async def role_checker(current_user: CurrentUser = Depends(get_current_user)):
-        # TODO: Implement actual role check when Usuario and UsuarioRol models exist
-        # For now, allow all authenticated users
+    async def role_checker(current_user: CurrentUser):
+        user_role_names = [role.nombre for role in current_user.roles]
+        if not any(role in user_role_names for role in allowed_roles):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permiso para acceder a este recurso",
+            )
         return current_user
-    
+
     return role_checker

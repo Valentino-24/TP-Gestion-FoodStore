@@ -1,6 +1,6 @@
 """Security utilities: password hashing and JWT."""
 
-from passlib.hash import bcrypt
+import bcrypt
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
 from typing import Optional
@@ -16,19 +16,25 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     Returns:
         True if password matches, False otherwise
     """
-    return bcrypt.verify(plain_password, hashed_password)
+    return bcrypt.checkpw(
+        plain_password.encode("utf-8"),
+        hashed_password.encode("utf-8"),
+    )
 
 
 def get_password_hash(password: str) -> str:
-    """Hash a password using bcrypt.
+    """Hash a password using bcrypt (cost factor 12).
     
     Args:
         password: The plain text password to hash
     
     Returns:
-        The hashed password
+        The hashed password string
     """
-    return bcrypt.hash(password)
+    return bcrypt.hashpw(
+        password.encode("utf-8"),
+        bcrypt.gensalt(rounds=12),
+    ).decode("utf-8")
 
 
 def create_access_token(

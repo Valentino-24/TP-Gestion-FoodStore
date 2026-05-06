@@ -1,16 +1,14 @@
 """FormaPago model for seed data."""
 
-from sqlalchemy import Integer, String, Boolean
-from sqlmodel import Field
-
-from app.database import Base
+from sqlmodel import SQLModel, Field
+from sqlalchemy import Integer, String, Boolean, Column
 
 
-class FormaPago(Base, table=True):
+class FormaPago(SQLModel, table=True):
     """FormaPago table for payment methods."""
-    
+
     __tablename__ = "forma_pago"
-    
-    id: int = Field(primary_key=True)
-    nombre: str = Field(unique=True, index=True)
-    activo: bool = Field(default=True)
+
+    id: int = Field(sa_column=Column(Integer, primary_key=True))
+    nombre: str = Field(sa_column=Column(String(100), unique=True, index=True, nullable=False))
+    activo: bool = Field(sa_column=Column(Boolean, default=True))

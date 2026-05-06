@@ -1,7 +1,7 @@
 """Unit of Work pattern for atomic database operations."""
 
 from contextlib import asynccontextmanager
-from typing import Async_generator
+from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import async_session_maker
