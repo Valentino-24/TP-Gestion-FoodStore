@@ -63,11 +63,13 @@ def create_app() -> FastAPI:
     async def health_check():
         return {"status": "healthy"}
 
-    # Register auth routers
+    # Register routers
     from app.auth.router import router as auth_router
+    from app.categorias.router import router as categorias_router
     from app.refreshtokens.router import router as refreshtokens_router
 
     app.include_router(auth_router, prefix=settings.API_PREFIX)
+    app.include_router(categorias_router, prefix=settings.API_PREFIX)
     app.include_router(refreshtokens_router, prefix=settings.API_PREFIX)
 
     return app

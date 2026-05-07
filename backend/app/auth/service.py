@@ -78,12 +78,15 @@ class AuthService:
             session.add(user)
             await session.flush()  # Get user.id
 
-            # Assign CLIENT role
+            # Assign CLIENT role via manual insert (avoids MissingGreenlet on ORM lazy load)
             user_role = UsuarioRol(usuario_id=user.id, rol_id=CLIENT_ROLE_ID)
             session.add(user_role)
 
+        # Reload user from DB using router session (attached, with roles loaded)
+        updated_user = await self.user_repo.get_with_roles(user.id)
+
         # Generate tokens after commit
-        return self._generate_token_pair(user)
+        return self._generate_token_pair(updated_user)
 
     async def login(self, data: LoginRequest) -> TokenResponse:
         """Authenticate user and return token pair.

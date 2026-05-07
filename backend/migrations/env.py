@@ -11,6 +11,7 @@ from alembic import context
 # Import models for Base.metadata
 from app.database import Base
 from app.config import settings
+from app.models import *  # noqa: F401, F403 — ensures all models are registered in Base.metadata
 
 # This is the Alembic Config object
 config = context.config

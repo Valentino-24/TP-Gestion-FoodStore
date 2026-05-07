@@ -47,13 +47,13 @@
 
 ## 9. Verification
 
-- [ ] 9.1 Register a new user via POST /api/v1/auth/register and verify 201 + tokens returned
-- [ ] 9.2 Login with registered user via POST /api/v1/auth/login and verify JWT contains userId, email, roles
-- [ ] 9.3 Test duplicate email registration returns 409
-- [ ] 9.4 Test weak password registration returns 422
-- [ ] 9.5 Test invalid credentials login returns 401 with generic message
-- [ ] 9.6 Test token refresh via POST /api/v1/auth/refresh — verify old token revoked, new pair issued
-- [ ] 9.7 Test logout via POST /api/v1/auth/logout — verify refresh token revoked
-- [ ] 9.8 Test GET /api/v1/auth/me with valid token — verify user data + roles returned
-- [ ] 9.9 Test GET /api/v1/auth/me without token — verify 401
-- [ ] 9.10 Test replay attack: use same refresh token twice — verify second attempt revokes all tokens
+- [x] 9.1 Register a new user via POST /api/v1/auth/register and verify 201 + tokens returned
+- [x] 9.2 Login with registered user via POST /api/v1/auth/login and verify JWT contains userId, email, roles
+- [x] 9.3 Test duplicate email registration returns 409
+- [x] 9.4 Test weak password registration returns 422
+- [x] 9.5 Test invalid credentials login returns 401 with generic message
+- [x] 9.6 Test token refresh via POST /api/v1/auth/refresh — verify old token revoked, new pair issued
+- [x] 9.7 Test logout via POST /api/v1/auth/logout — verify refresh token revoked
+- [x] 9.8 Test GET /api/v1/auth/me with valid token — verify user data + roles returned
+- [x] 9.9 Test GET /api/v1/auth/me without token — verify 401
+- [x] 9.10 Test replay attack: use same refresh token twice — verify second attempt revokes all tokens

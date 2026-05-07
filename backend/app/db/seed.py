@@ -35,6 +35,14 @@ FORMAS_PAGO = [
     (2, "Tarjeta de debito", True),
 ]
 
+CATEGORIAS = [
+    (1, "Bebidas", "Aguas, gaseosas, jugos y bebidas alcoholicas"),
+    (2, "Comidas", "Platos preparados, comidas al paso y menus ejecutivos"),
+    (3, "Snacks", "Picadas, papas fritas, frutos secos y bocaditos"),
+    (4, "Postres", "Dulces, pasteleria, helados y reposteria"),
+    (5, "Otros", "Productos que no encajan en las categorias anteriores"),
+]
+
 
 def get_sync_url(async_url: str) -> str:
     """Convert an async database URL to a sync one.
@@ -106,6 +114,17 @@ def seed_formas_pago(conn):
             """), {"id": forma[0], "nombre": forma[1], "activo": forma[2]})
 
 
+def seed_categorias(conn):
+    """Seed Categoria table."""
+    with conn.begin():
+        for cat in CATEGORIAS:
+            conn.execute(text("""
+                INSERT INTO categoria (id, nombre, descripcion, activo)
+                VALUES (:id, :nombre, :descripcion, TRUE)
+                ON CONFLICT (id) DO NOTHING
+            """), {"id": cat[0], "nombre": cat[1], "descripcion": cat[2]})
+
+
 def run_seed():
     """Run all seeds."""
     # Read DATABASE_URL from environment (same as app config uses)
@@ -132,6 +151,10 @@ def run_seed():
         with engine.connect() as conn:
             seed_formas_pago(conn)
         print("✓ Seeded formas_pago")
+
+        with engine.connect() as conn:
+            seed_categorias(conn)
+        print("✓ Seeded categorias")
 
         # Verify
         with engine.connect() as conn:
