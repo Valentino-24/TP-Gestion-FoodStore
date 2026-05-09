@@ -66,10 +66,12 @@ def create_app() -> FastAPI:
     # Register routers
     from app.auth.router import router as auth_router
     from app.categorias.router import router as categorias_router
+    from app.productos.router import router as productos_router
     from app.refreshtokens.router import router as refreshtokens_router
 
     app.include_router(auth_router, prefix=settings.API_PREFIX)
     app.include_router(categorias_router, prefix=settings.API_PREFIX)
+    app.include_router(productos_router, prefix=settings.API_PREFIX)
     app.include_router(refreshtokens_router, prefix=settings.API_PREFIX)
 
     return app

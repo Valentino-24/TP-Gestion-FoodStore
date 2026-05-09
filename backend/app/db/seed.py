@@ -43,6 +43,24 @@ CATEGORIAS = [
     (5, "Otros", "Productos que no encajan en las categorias anteriores"),
 ]
 
+PRODUCTOS = [
+    (1, "Coca-Cola", "Gaseosa sabor cola 500ml", 2.50, 1),
+    (2, "Agua", "Agua mineral sin gas 500ml", 1.00, 1),
+    (3, "Jugo de Naranja", "Jugo de naranja natural exprimido 400ml", 3.00, 1),
+    (4, "Hamburguesa", "Hamburguesa completa con cheddar y bacon", 8.50, 2),
+    (5, "Pizza", "Pizza de mozzarella por porcion", 12.00, 2),
+    (6, "Ensalada", "Ensalada mixta con pollo y vegetales frescos", 7.50, 2),
+    (7, "Papas Fritas", "Papas fritas crocantes porcion mediana", 3.50, 3),
+    (8, "Nachos", "Nachos con queso cheddar y guacamole", 4.00, 3),
+    (9, "Barrita de cereal", "Barrita de cereal con chocolate", 1.50, 3),
+    (10, "Helado", "Helado artesanal 2 bochas", 4.50, 4),
+    (11, "Flan", "Flan casero con dulce de leche", 3.00, 4),
+    (12, "Brownie", "Brownie de chocolate con nueces", 2.50, 4),
+    (13, "Salsa de tomate", "Salsa de tomate para acompaniar", 1.00, 5),
+    (14, "Mayonesa", "Mayonesa clasica 100g", 1.00, 5),
+    (15, "Aderezo", "Aderezo criollo para empanadas", 1.50, 5),
+]
+
 
 def get_sync_url(async_url: str) -> str:
     """Convert an async database URL to a sync one.
@@ -125,6 +143,17 @@ def seed_categorias(conn):
             """), {"id": cat[0], "nombre": cat[1], "descripcion": cat[2]})
 
 
+def seed_productos(conn):
+    """Seed Producto table."""
+    with conn.begin():
+        for prod in PRODUCTOS:
+            conn.execute(text("""
+                INSERT INTO producto (id, nombre, descripcion, precio, categoria_id, activo)
+                VALUES (:id, :nombre, :descripcion, :precio, :categoria_id, TRUE)
+                ON CONFLICT (id) DO NOTHING
+            """), {"id": prod[0], "nombre": prod[1], "descripcion": prod[2], "precio": prod[3], "categoria_id": prod[4]})
+
+
 def run_seed():
     """Run all seeds."""
     # Read DATABASE_URL from environment (same as app config uses)
@@ -155,6 +184,10 @@ def run_seed():
         with engine.connect() as conn:
             seed_categorias(conn)
         print("✓ Seeded categorias")
+
+        with engine.connect() as conn:
+            seed_productos(conn)
+        print("✓ Seeded productos")
 
         # Verify
         with engine.connect() as conn:
