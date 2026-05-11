@@ -80,18 +80,18 @@
 
 ### 8. Verification
 
-- [ ] **8.1** Verify POST /api/v1/productos (admin) → 201
-- [ ] **8.2** Verify POST /api/v1/productos (non-admin) → 403
-- [ ] **8.3** Verify POST /api/v1/productos with invalid categoria_id → 404
-- [ ] **8.4** Verify GET /api/v1/productos (authenticated) → 200 with paginated list
-- [ ] **8.5** Verify GET /api/v1/productos?categoria_id=1 → 200, filtered
-- [ ] **8.6** Verify GET /api/v1/productos (unauthenticated) → 401
-- [ ] **8.7** Verify GET /api/v1/productos/{id} → 200
-- [ ] **8.8** Verify GET /api/v1/productos/{id} (non-existent) → 404
-- [ ] **8.9** Verify PUT /api/v1/productos/{id} → 200
-- [ ] **8.10** Verify DELETE /api/v1/productos/{id} → 204 + soft-delete confirmed
-- [ ] **8.11** Verify seed products exist after seed
-- [ ] **8.12** Verify pagination: GET /api/v1/productos?page=1&size=3 returns correct count
+- [x] **8.1** Verify POST /api/v1/productos (admin) → 201
+- [x] **8.2** Verify POST /api/v1/productos (non-admin) → 403
+- [x] **8.3** Verify POST /api/v1/productos with invalid categoria_id → 404
+- [x] **8.4** Verify GET /api/v1/productos (authenticated) → 200 with paginated list
+- [x] **8.5** Verify GET /api/v1/productos?categoria_id=1 → 200, filtered
+- [x] **8.6** Verify GET /api/v1/productos (unauthenticated) → 401
+- [x] **8.7** Verify GET /api/v1/productos/{id} → 200
+- [x] **8.8** Verify GET /api/v1/productos/{id} (non-existent) → 404
+- [x] **8.9** Verify PUT /api/v1/productos/{id} → 200
+- [x] **8.10** Verify DELETE /api/v1/productos/{id} → 204 + soft-delete confirmed
+- [x] **8.11** Verify seed products exist after seed
+- [x] **8.12** Verify pagination: GET /api/v1/productos?page=1&size=3 returns correct count
 
 ---
 

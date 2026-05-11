@@ -1,14 +1,16 @@
 """Database seed using pg8000."""
 
+import os
+
 import pg8000.native
 
 print("Testing with pg8000...")
 
 conn = pg8000.native.Connection(
-    user="postgres",
-    password="admin",
-    host="localhost",
-    database="foodstore"
+    user=os.environ.get("PGUSER", "postgres"),
+    password=os.environ.get("PGPASSWORD", "admin"),
+    host=os.environ.get("PGHOST", "localhost"),
+    database=os.environ.get("PGDATABASE", "foodstore"),
 )
 print("Connected!")
 

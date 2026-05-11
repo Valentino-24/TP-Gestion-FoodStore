@@ -1,0 +1,21 @@
+## 1. Hook de productos
+
+- [x] 1.1 Crear `src/hooks/useProducts.ts` con fetch de lista paginada (`GET /productos/?page=&size=&categoria_id=`)
+- [x] 1.2 Implementar estados loading, error, empty y data en el hook
+- [x] 1.3 Implementar fetch de detalle (`GET /productos/{id}`) en el hook
+- [x] 2.1 Crear `src/components/ProductCard.tsx` — card con nombre, precio, badge de categoría, imagen placeholder
+- [x] 2.2 Crear `src/components/ProductGrid.tsx` — grilla responsive (1-2-3-4 columnas)
+- [x] 2.3 Crear `src/components/Pagination.tsx` — controles Anterior/Siguiente + números de página + "Mostrando X-Y de Z"
+- [x] 2.4 Crear `src/components/CategoryFilter.tsx` — dropdown con "Todas las categorías" + categorías del backend
+- [x] 3.1 Crear `src/pages/ProductListPage.tsx` — integra ProductGrid + Pagination + CategoryFilter con useProducts
+- [x] 3.2 Crear `src/pages/ProductDetailPage.tsx` — detalle del producto con fetch por ID + botón "Volver al catálogo"
+- [x] 3.3 Actualizar `HomePage.tsx` con sección de productos destacados (primeros 4)
+- [x] 4.1 Actualizar `src/router.tsx` — reemplazar placeholder `/productos` por `ProductListPage`, agregar `/productos/:id`
+- [x] 4.2 Actualizar `Navbar.tsx` — link a /productos (si no existe ya)
+- [x] 4.3 Verificar navegación entre Home → Catálogo → Detalle → Volver (implementado en router)
+- [x] 5.1 Verificar que `npm run build` produce build exitoso
+- [x] 5.2 Verificar que la grilla muestra productos del backend
+- [x] 5.3 Verificar que el filtro por categoría funciona
+- [x] 5.4 Verificar que la paginación funciona
+- [x] 5.5 Verificar que el detalle de producto carga correctamente
+- [x] 5.6 Verificar que la home muestra productos destacados

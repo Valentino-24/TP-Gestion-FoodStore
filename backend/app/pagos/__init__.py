@@ -1,3 +1,1 @@
-"""Pagos module - skeleton."""
-
-# To be implemented in pagos feature
+"""Pagos module — MercadoPago integration with simulated fallback."""

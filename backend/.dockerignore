@@ -1,0 +1,11 @@
+# backend/.dockerignore
+__pycache__/
+.venv/
+.env
+*.pyc
+.git/
+.gitkeep
+server_err.txt
+server_out.txt
+test_pg.bat
+test_pg.ps1

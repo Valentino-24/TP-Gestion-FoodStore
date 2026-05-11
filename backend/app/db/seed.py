@@ -43,6 +43,12 @@ CATEGORIAS = [
     (5, "Otros", "Productos que no encajan en las categorias anteriores"),
 ]
 
+CLIENTES = [
+    (1, "Carlos", "Garcia", "carlos.garcia@email.com", "1123456789", "Av. Corrientes 1234, CABA"),
+    (2, "Maria", "Lopez", "maria.lopez@email.com", "1198765432", "Calle Florida 567, CABA"),
+    (3, "Juan", "Martinez", "juan.martinez@email.com", "1144556677", "Av. Santa Fe 890, CABA"),
+]
+
 PRODUCTOS = [
     (1, "Coca-Cola", "Gaseosa sabor cola 500ml", 2.50, 1),
     (2, "Agua", "Agua mineral sin gas 500ml", 1.00, 1),
@@ -154,6 +160,17 @@ def seed_productos(conn):
             """), {"id": prod[0], "nombre": prod[1], "descripcion": prod[2], "precio": prod[3], "categoria_id": prod[4]})
 
 
+def seed_clientes(conn):
+    """Seed Cliente table."""
+    with conn.begin():
+        for cli in CLIENTES:
+            conn.execute(text("""
+                INSERT INTO cliente (id, nombre, apellido, email, telefono, direccion, activo)
+                VALUES (:id, :nombre, :apellido, :email, :telefono, :direccion, TRUE)
+                ON CONFLICT (id) DO NOTHING
+            """), {"id": cli[0], "nombre": cli[1], "apellido": cli[2], "email": cli[3], "telefono": cli[4], "direccion": cli[5]})
+
+
 def run_seed():
     """Run all seeds."""
     # Read DATABASE_URL from environment (same as app config uses)
@@ -188,6 +205,10 @@ def run_seed():
         with engine.connect() as conn:
             seed_productos(conn)
         print("✓ Seeded productos")
+
+        with engine.connect() as conn:
+            seed_clientes(conn)
+        print("✓ Seeded clientes")
 
         # Verify
         with engine.connect() as conn:

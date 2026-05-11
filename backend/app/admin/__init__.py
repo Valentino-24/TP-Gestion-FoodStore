@@ -1,3 +1,1 @@
-"""Admin module - skeleton."""
-
-# To be implemented in admin feature
+"""Admin module — dashboard stats for the admin panel."""

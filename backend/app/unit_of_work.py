@@ -22,7 +22,7 @@ class UnitOfWork:
         self._session_maker = async_session_maker
     
     @asynccontextmanager
-    async def __call__(self) -> Async_generator[AsyncSession, None]:
+    async def __call__(self) -> AsyncGenerator[AsyncSession, None]:
         """Context manager for UoW.
         
         Yields:
