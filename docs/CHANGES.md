@@ -1,7 +1,8 @@
 # FoodStore — Mapa de Changes
 
 > Documentación de cambios completados y roadmap de cambios futuros.
-> Generado: 2026-05-11
+> Generado: 2026-05-13
+> NOTA: us-010-docker revertido — el proyecto corre localmente con PostgreSQL directo
 
 ---
 
@@ -23,8 +24,15 @@ gantt
     us-006 Catálogo Productos :done, 2026-05-11, 1d
     us-007 Carrito + Pagos :done, 2026-05-11, 1d
     
-    section Frontend (pendiente)
-    Panel Admin            :active, 2026-05-11, 1d
+    section Frontend
+    us-005 Frontend Base   :done, 2026-05-11, 1d
+    us-006 Catálogo        :done, 2026-05-11, 1d
+    us-007 Carrito + Pagos :done, 2026-05-11, 1d
+    us-008 Panel Admin     :done, 2026-05-11, 1d
+    us-009 Perfil          :done, 2026-05-11, 1d
+    
+    section Testing
+    us-011 Tests           :active, 2026-05-13, 2d
 ```
 
 | Change | Fecha | Descripción | Tasks |
@@ -37,6 +45,8 @@ gantt
 | `us-005-frontend-base` | 2026-05-11 | Frontend base: Vite + React + TS + TailwindCSS, routing, auth UI, layouts, axios interceptors | 35 |
 | `us-006-frontend-productos` | 2026-05-11 | Catálogo frontend: grilla, paginación, filtro por categoría, detalle de producto, productos destacados | 19 |
 | `us-007-frontend-carrito` | 2026-05-11 | Flujo de compra completo: carrito, checkout, pedidos, pagos simulado, direcciones frontend | 40 |
+| `us-008-frontend-admin` | 2026-05-11 | Panel admin: dashboard con métricas, CRUD productos/categorías/clientes/pedidos | 40 |
+| `us-009-frontend-perfil` | 2026-05-11 | Perfil de usuario + gestión de direcciones | 17 |
 
 ### Módulos del backend
 
@@ -55,6 +65,8 @@ gantt
 | `pagos/` | ✅ | us-007-frontend-carrito | Pago MercadoPago /api/v1/pagos |
 | `direcciones/` | ✅ | us-007-frontend-carrito | CRUD /api/v1/direcciones |
 | `frontend cart/` | ✅ | us-007-frontend-carrito | Carrito, checkout, pedidos, direcciones frontend |
+| `frontend admin/` | ✅ | us-008-frontend-admin | Panel admin: dashboard, CRUD productos/categorías/clientes/pedidos |
+| `frontend perfil/` | ✅ | us-009-frontend-perfil | Perfil + edición de datos personales |
 
 ---
 
@@ -70,9 +82,8 @@ us-005 ──▶ us-006 ──▶ us-007 ──▶ us-009
          │
          └── admin panel
 
-INFRA + TESTS
-═════════════
-us-010 ── Docker Compose
+TESTS
+═════
 us-011 ── Tests automatizados
 ```
 
@@ -159,21 +170,6 @@ Vite + React + TypeScript + TailwindCSS
 
 ---
 
-### us-010-docker 🟢 Baja
-
-**Dependencias**: ninguna  
-**Tasks estimadas**: 4-5  
-**Descripción**: Entorno local con Docker Compose.
-
-```yaml
-docker-compose.yml
-├── api        → backend FastAPI + Uvicorn
-├── db         → PostgreSQL 16
-└── frontend   → Vite dev server
-```
-
----
-
 ### us-011-tests 🟢 Baja
 
 **Dependencias**: ninguna  
@@ -207,7 +203,6 @@ Frontend:
 | us-005 | Frontend base | 🔴 Alta | — | 35 | ✅ Archivado |
 | us-006 | Catálogo productos | 🔴 Alta | us-005 | 19 | ✅ Archivado |
 | us-007 | Carrito + pagos | 🔴 Alta | us-005, us-006 | 40 | ✅ Archivado |
-| us-008 | Panel admin | 🟡 Media | us-005 | 8-10 | ⏳ Pendiente |
-| us-009 | Perfil + direcciones | 🟡 Media | us-005 | 4-5 | ⏳ Pendiente |
-| us-010 | Docker | 🟢 Baja | — | 4-5 | ⏳ Pendiente |
-| us-011 | Tests | 🟢 Baja | — | 8-10 | ⏳ Pendiente |
+| us-008 | Panel admin | 🟡 Media | us-005 | 8-10 | ✅ Archivado |
+| us-009 | Perfil + direcciones | 🟡 Media | us-005 | 4-5 | ✅ Archivado |
+| us-011 | Tests | 🟢 Baja | — | 8-10 | 🔄 Activo |
