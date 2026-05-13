@@ -8,6 +8,7 @@ pydantic-settings
 alembic
 passlib[bcrypt]
 python-jose
+pg8000
 slowapi
 mercadopago
 httpx
