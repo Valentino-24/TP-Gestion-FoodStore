@@ -27,6 +27,7 @@ interface PedidoResponse {
 const FORMAS_PAGO = [
   { id: 1, nombre: 'Tarjeta de crédito' },
   { id: 2, nombre: 'Tarjeta de débito' },
+  { id: 3, nombre: 'Efectivo' },
 ]
 
 // ── Component ──────────────────────────────────────────────────
@@ -116,7 +117,12 @@ export default function CheckoutPage() {
 
       const { data } = await apiClient.post<PedidoResponse>('/pedidos/', payload)
       clearCart()
-      navigate(`/pago/${data.id}`)
+      // Redirect según forma de pago: Efectivo → pedidos, Tarjeta → pago
+      if (selectedFormaPagoId === 3) {
+        navigate(`/pedidos/${data.id}`)
+      } else {
+        navigate(`/pago/${data.id}`)
+      }
     } catch (err: unknown) {
       const msg =
         err && typeof err === 'object' && 'response' in err

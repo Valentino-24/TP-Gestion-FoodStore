@@ -33,6 +33,7 @@ ESTADOS_PEDIDO = [
 FORMAS_PAGO = [
     (1, "Tarjeta de credito", True),
     (2, "Tarjeta de debito", True),
+    (3, "Efectivo", True),
 ]
 
 CATEGORIAS = [

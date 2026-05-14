@@ -1,11 +1,26 @@
 import { Link } from 'react-router-dom'
+import { useCart } from '@/hooks/useCart'
 import type { Producto } from '@/hooks/useProducts'
 
 interface Props {
   product: Producto
+  categoria_nombre?: string
 }
 
-export default function ProductCard({ product }: Props) {
+export default function ProductCard({ product, categoria_nombre }: Props) {
+  const { addItem } = useCart()
+
+  function handleAddToCart(e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    addItem({
+      producto_id: product.id,
+      producto_nombre: product.nombre,
+      precio_unitario: product.precio,
+      imagen_url: product.imagen_url,
+    })
+  }
+
   return (
     <Link
       to={`/productos/${product.id}`}
@@ -39,9 +54,16 @@ export default function ProductCard({ product }: Props) {
           ${product.precio.toFixed(2)}
         </span>
         <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
-          Cat. {product.categoria_id}
+          {categoria_nombre ?? `Cat. ${product.categoria_id}`}
         </span>
       </div>
+
+      <button
+        onClick={handleAddToCart}
+        className="mt-3 w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+      >
+        Agregar al carrito
+      </button>
     </Link>
   )
 }

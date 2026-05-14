@@ -1,10 +1,40 @@
+import { useState, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { useProductDetail } from '@/hooks/useProducts'
+import { useProductDetail, useCategories } from '@/hooks/useProducts'
+import { useCart } from '@/hooks/useCart'
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>()
   const productId = Number(id)
   const { product, loading, error } = useProductDetail(productId)
+  const { categories } = useCategories()
+  const { addItem } = useCart()
+
+  const [cantidad, setCantidad] = useState(1)
+  const [feedback, setFeedback] = useState<'idle' | 'added'>('idle')
+
+  function handleAddToCart() {
+    if (!product) return
+    addItem(
+      {
+        producto_id: product.id,
+        producto_nombre: product.nombre,
+        precio_unitario: product.precio,
+        imagen_url: product.imagen_url,
+      },
+      cantidad,
+    )
+    setFeedback('added')
+    setTimeout(() => setFeedback('idle'), 2000)
+  }
+
+  const categoryMap = useMemo(() => {
+    const map: Record<number, string> = {}
+    for (const cat of categories) {
+      map[cat.id] = cat.nombre
+    }
+    return map
+  }, [categories])
 
   if (loading) {
     return (
@@ -59,7 +89,7 @@ export default function ProductDetailPage() {
             <h1 className="text-2xl font-bold text-gray-900">{product.nombre}</h1>
 
             <span className="mt-2 inline-block rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-              Cat. {product.categoria_id}
+              {categoryMap[product.categoria_id] ?? `Cat. ${product.categoria_id}`}
             </span>
 
             <p className="mt-4 text-gray-600">
@@ -68,6 +98,38 @@ export default function ProductDetailPage() {
 
             <div className="mt-6 text-3xl font-bold text-gray-900">
               ${product.precio.toFixed(2)}
+            </div>
+
+            {/* Quantity + Add to cart */}
+            <div className="mt-6 flex items-center gap-3">
+              <div className="flex items-center rounded-lg border border-gray-300">
+                <button
+                  onClick={() => setCantidad((c) => Math.max(1, c - 1))}
+                  className="flex h-10 w-10 items-center justify-center text-gray-600 hover:bg-gray-100"
+                >
+                  −
+                </button>
+                <span className="flex h-10 w-12 items-center justify-center text-sm font-medium text-gray-900">
+                  {cantidad}
+                </span>
+                <button
+                  onClick={() => setCantidad((c) => c + 1)}
+                  className="flex h-10 w-10 items-center justify-center text-gray-600 hover:bg-gray-100"
+                >
+                  +
+                </button>
+              </div>
+
+              <button
+                onClick={handleAddToCart}
+                className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium text-white transition ${
+                  feedback === 'added'
+                    ? 'bg-green-600'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
+              >
+                {feedback === 'added' ? '✓ Agregado' : 'Agregar al carrito'}
+              </button>
             </div>
           </div>
         </div>

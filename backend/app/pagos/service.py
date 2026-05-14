@@ -1,4 +1,4 @@
-"""Pagos service — business logic for MercadoPago integration."""
+"""Pagos service — business logic for MercadoPago integration (real payments)."""
 
 from datetime import datetime, timezone
 from typing import Optional
@@ -22,17 +22,18 @@ class PagoService:
         self.db = db
 
     async def create_payment(self, data: PagoCreate, pedido: Pedido) -> Pago:
-        """Initiate a payment for a pedido.
-
-        Uses MercadoPago SDK if credentials are configured,
-        otherwise falls back to simulated payment.
+        """Initiate a payment for a pedido using MercadoPago SDK.
 
         Args:
-            data: Payment creation data.
+            data: Payment creation data with mp_token from Card Brick.
             pedido: The pedido being paid for.
 
         Returns:
             The created Pago record.
+
+        Raises:
+            HTTPException 400: If pedido not in PENDIENTE state or uses Efectivo.
+            HTTPException 503: If MP_ACCESS_TOKEN is not configured.
         """
         # Check pedido state
         if pedido.estado != "PENDIENTE":
@@ -41,54 +42,61 @@ class PagoService:
                 detail="El pedido no está en estado PENDIENTE",
             )
 
-        # Try MercadoPago if configured and token looks valid
+        # Efectivo doesn't require online payment
+        if pedido.forma_pago_id == 3:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El pedido usa Efectivo, no requiere pago online",
+            )
+
+        # Require MP credentials
+        if not settings.MP_ACCESS_TOKEN:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="MercadoPago no configurado",
+            )
+
         mp_pago_id: Optional[str] = None
         mp_status: Optional[str] = None
         pago_estado = "pendiente"
 
-        if settings.MP_ACCESS_TOKEN and not settings.MP_ACCESS_TOKEN.startswith("TEST-"):
-            try:
-                import mercadopago
-                sdk = mercadopago.SDK(settings.MP_ACCESS_TOKEN)
-                payment_data = {
-                    "transaction_amount": float(pedido.total),
-                    "description": f"Pedido #{pedido.id} - FoodStore",
-                    "payment_method_id": "visa",
-                    "installments": 1,
-                    "token": data.mp_token or "",
-                }
-                result = sdk.payment().create(payment_data)
-                if result.get("status") == 201:
-                    response = result.get("response", {})
-                    mp_pago_id = str(response.get("id", ""))
-                    mp_status = response.get("status", "pending")
-                    if mp_status == "approved":
-                        pago_estado = "aprobado"
-                    elif mp_status == "rejected":
-                        pago_estado = "rechazado"
-                else:
-                    pago_estado = "error"
-                    mp_status = "api_error"
-            except Exception:
+        try:
+            import mercadopago
+            sdk = mercadopago.SDK(settings.MP_ACCESS_TOKEN)
+            payment_data = {
+                "transaction_amount": float(pedido.total),
+                "description": f"Pedido #{pedido.id} - FoodStore",
+                "payment_method_id": "visa",
+                "installments": 1,
+                "token": data.mp_token or "",
+            }
+            result = sdk.payment().create(payment_data)
+            if result.get("status") == 201:
+                response = result.get("response", {})
+                mp_pago_id = str(response.get("id", ""))
+                mp_status = response.get("status", "pending")
+                if mp_status == "approved":
+                    pago_estado = "aprobado"
+                elif mp_status == "rejected":
+                    pago_estado = "rechazado"
+            else:
                 pago_estado = "error"
-                mp_status = "exception"
-        else:
-            # Simulated payment (dev/test mode)
-            mp_pago_id = None
-            mp_status = "simulated"
-            pago_estado = "aprobado"
+                mp_status = "api_error"
+        except Exception:
+            pago_estado = "error"
+            mp_status = "exception"
 
         pago = Pago(
             pedido_id=pedido.id,
             monto=pedido.total,
-            metodo="mercadopago" if (settings.MP_ACCESS_TOKEN and not settings.MP_ACCESS_TOKEN.startswith("TEST-")) else "simulado",
+            metodo="mercadopago",
             estado=pago_estado,
             mp_pago_id=mp_pago_id,
             mp_status=mp_status,
         )
         created = await self.repo.create(pago)
 
-        # If payment approved (or simulated), transition pedido to CONFIRMADO
+        # If payment approved, transition pedido to CONFIRMADO
         if pago_estado == "aprobado" and can_transition(pedido.estado, "CONFIRMADO"):
             pedido.estado = "CONFIRMADO"
             pedido.actualizado_en = datetime.now(timezone.utc)
@@ -109,7 +117,7 @@ class PagoService:
         if not payment_id:
             return
 
-        if (action == "payment.updated" or "payment" in str(action)) and settings.MP_ACCESS_TOKEN and not settings.MP_ACCESS_TOKEN.startswith("TEST-"):
+        if (action == "payment.updated" or "payment" in str(action)) and settings.MP_ACCESS_TOKEN:
             try:
                 import mercadopago
                 sdk = mercadopago.SDK(settings.MP_ACCESS_TOKEN)

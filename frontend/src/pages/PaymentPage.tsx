@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import apiClient from '@/lib/apiClient'
+import { useMercadoPago } from '@/hooks/useMercadoPago'
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -31,6 +32,14 @@ export default function PaymentPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Card form fields
+  const [cardNumber, setCardNumber] = useState('')
+  const [cardExpiry, setCardExpiry] = useState('')
+  const [cardCvv, setCardCvv] = useState('')
+  const [cardName, setCardName] = useState('')
+
+  const { createCardToken, status: mpStatus } = useMercadoPago()
+
   // Load pedido info on mount
   useEffect(() => {
     if (!pedidoId) return
@@ -51,31 +60,80 @@ export default function PaymentPage() {
     return () => { cancelled = true }
   }, [pedidoId])
 
-  async function handlePay() {
-    if (!pedidoId) return
-    setPaymentState('processing')
-    setError(null)
+  // Format card number with spaces
+  function handleCardNumberChange(value: string) {
+    const digits = value.replace(/\D/g, '').slice(0, 16)
+    const formatted = digits.replace(/(\d{4})(?=\d)/g, '$1 ')
+    setCardNumber(formatted)
+  }
 
-    try {
-      const { data } = await apiClient.post<PagoResponse>('/pagos/', {
-        pedido_id: Number(pedidoId),
-      })
-      setPago(data)
-      setPaymentState(data.estado === 'aprobado' ? 'success' : 'error')
-      if (data.estado === 'aprobado') {
-        // Refresh pedido to get updated estado (CONFIRMADO)
-        const pedidoRes = await apiClient.get<PedidoResponse>(`/pedidos/${pedidoId}`)
-        setPedido(pedidoRes.data)
-      }
-    } catch (err: unknown) {
-      const msg =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Error al procesar el pago'
-          : 'Error de conexión'
-      setError(msg)
-      setPaymentState('error')
+  // Format expiry as MM/YYYY
+  function handleExpiryChange(value: string) {
+    const digits = value.replace(/\D/g, '').slice(0, 6)
+    if (digits.length <= 2) {
+      setCardExpiry(digits)
+    } else if (digits.length <= 4) {
+      setCardExpiry(`${digits.slice(0, 2)}/${digits.slice(2)}`)
+    } else {
+      setCardExpiry(`${digits.slice(0, 2)}/${digits.slice(2, 6)}`)
     }
   }
+
+  async function handlePay() {
+    if (!pedidoId || !pedido) return
+
+    setError(null)
+    setPaymentState('processing')
+
+    try {
+      // Parse expiry (accepts MM/YY or MM/YYYY)
+      const parts = cardExpiry.split('/')
+      const month = parts[0]
+      let year = parts[1]
+      if (!month || !year) throw new Error('Fecha de vencimiento inválida')
+      if (year.length === 2) year = '20' + year
+      if (year.length !== 4) throw new Error('Fecha de vencimiento inválida')
+
+      // Create card token via MercadoPago
+      const token = await createCardToken({
+        cardNumber,
+        cardExpirationMonth: month,
+        cardExpirationYear: year,
+        securityCode: cardCvv,
+        cardholderName: cardName,
+      })
+
+      // Send token to backend
+      const { data } = await apiClient.post<PagoResponse>('/pagos/', {
+        pedido_id: Number(pedidoId),
+        mp_token: token,
+      })
+
+      setPago(data)
+
+      if (data.estado === 'aprobado') {
+        setPaymentState('success')
+        const pedidoRes = await apiClient.get<PedidoResponse>(`/pedidos/${pedidoId}`)
+        setPedido(pedidoRes.data)
+      } else {
+        setPaymentState('error')
+        setError(
+          data.mp_status === 'rejected'
+            ? 'El pago fue rechazado. Verificá los datos de la tarjeta e intentá de nuevo.'
+            : 'Error al procesar el pago',
+        )
+      }
+    } catch (err: unknown) {
+      setPaymentState('error')
+      const msg =
+        err && typeof err === 'object' && 'message' in err
+          ? (err as { message: string }).message
+          : 'Error al procesar el pago'
+      setError(msg)
+    }
+  }
+
+  // ── Render ───────────────────────────────────────────────────
 
   if (loading) {
     return (
@@ -96,6 +154,12 @@ export default function PaymentPage() {
     )
   }
 
+  const isFormValid =
+    cardNumber.replace(/\s/g, '').length >= 13 &&
+    cardExpiry.length === 5 &&
+    cardCvv.length >= 3 &&
+    cardName.trim().length > 0
+
   return (
     <div className="mx-auto max-w-2xl">
       <h1 className="mb-6 text-2xl font-bold text-gray-900">Pago</h1>
@@ -104,16 +168,19 @@ export default function PaymentPage() {
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900">Pedido #{pedido.id}</h2>
-          <span className={`rounded-full px-3 py-1 text-xs font-medium ${
-            pedido.estado === 'PENDIENTE' ? 'bg-yellow-100 text-yellow-800' :
-            pedido.estado === 'CONFIRMADO' ? 'bg-green-100 text-green-800' :
-            'bg-blue-100 text-blue-800'
-          }`}>
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-medium ${
+              pedido.estado === 'PENDIENTE'
+                ? 'bg-yellow-100 text-yellow-800'
+                : pedido.estado === 'CONFIRMADO'
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-blue-100 text-blue-800'
+            }`}
+          >
             {pedido.estado}
           </span>
         </div>
 
-        {/* Items */}
         <div className="space-y-2">
           {pedido.items.map((item) => (
             <div key={item.id} className="flex justify-between text-sm">
@@ -133,18 +200,95 @@ export default function PaymentPage() {
         </div>
       </div>
 
-      {/* Payment section */}
+      {/* Card form section */}
       {paymentState === 'idle' && (
         <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <p className="mb-4 text-sm text-gray-600">
-            Hacé clic en "Pagar ahora" para procesar el pago. En esta versión de demostración, el pago se simulará y se aprobará automáticamente.
-          </p>
-          <button
-            onClick={handlePay}
-            className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            Pagar ahora — ${pedido.total.toFixed(2)}
-          </button>
+          <h3 className="mb-4 text-sm font-semibold text-gray-900">Datos de la tarjeta</h3>
+
+          {mpStatus === 'loading' && (
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+              Cargando MercadoPago...
+            </div>
+          )}
+
+          {mpStatus === 'error' && (
+            <p className="mb-3 text-sm text-red-600">
+              Error al cargar MercadoPago. Verificá la configuración.
+            </p>
+          )}
+
+          {mpStatus === 'ready' && (
+            <form
+              onSubmit={(e) => { e.preventDefault(); handlePay() }}
+              className="space-y-4"
+            >
+              {/* Card number */}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-700">Número de tarjeta</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="4532 1234 5678 9012"
+                  value={cardNumber}
+                  onChange={(e) => handleCardNumberChange(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  required
+                />
+              </div>
+
+              {/* Name */}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-700">Titular de la tarjeta</label>
+                <input
+                  type="text"
+                  placeholder="Juan Pérez"
+                  value={cardName}
+                  onChange={(e) => setCardName(e.target.value.toUpperCase())}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  required
+                />
+              </div>
+
+              {/* Expiry + CVV row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-700">Vencimiento</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="MM/AA"
+                    value={cardExpiry}
+                    onChange={(e) => handleExpiryChange(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-700">CVV</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="123"
+                    value={cardCvv}
+                    onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                    required
+                  />
+                </div>
+              </div>
+
+              {error && <p className="text-sm text-red-600">{error}</p>}
+
+              <button
+                type="submit"
+                disabled={!isFormValid}
+                className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                Pagar ${pedido.total.toFixed(2)}
+              </button>
+            </form>
+          )}
         </div>
       )}
 
@@ -185,7 +329,7 @@ export default function PaymentPage() {
           <h2 className="text-lg font-semibold text-red-800">Error en el pago</h2>
           {error && <p className="mt-1 text-sm text-red-700">{error}</p>}
           <button
-            onClick={handlePay}
+            onClick={() => { setPaymentState('idle'); setError(null) }}
             className="mt-4 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
           >
             Reintentar

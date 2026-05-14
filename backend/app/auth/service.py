@@ -65,8 +65,9 @@ class AuthService:
         # Hash password in service layer (D4)
         password_hash = get_password_hash(data.password)
 
-        # Create user and assign CLIENT role within UoW
+        # Create user, assign CLIENT role, and create Cliente within same UoW
         from app.models.usuario import Usuario
+        from app.models.cliente import Cliente
 
         async with self.uow as session:
             user = Usuario(
@@ -81,6 +82,14 @@ class AuthService:
             # Assign CLIENT role via manual insert (avoids MissingGreenlet on ORM lazy load)
             user_role = UsuarioRol(usuario_id=user.id, rol_id=CLIENT_ROLE_ID)
             session.add(user_role)
+
+            # Create Cliente record linked by email (same data as registration)
+            cliente = Cliente(
+                nombre=data.nombre,
+                apellido=data.apellido,
+                email=data.email,
+            )
+            session.add(cliente)
 
         # Reload user from DB using router session (attached, with roles loaded)
         updated_user = await self.user_repo.get_with_roles(user.id)

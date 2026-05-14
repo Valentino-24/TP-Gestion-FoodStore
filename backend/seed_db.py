@@ -45,6 +45,7 @@ print("Estados seeded")
 # Seed formas_pago
 conn.run("INSERT INTO forma_pago (id, nombre, activo) VALUES (1, 'Tarjeta de credito', true) ON CONFLICT (id) DO NOTHING")
 conn.run("INSERT INTO forma_pago (id, nombre, activo) VALUES (2, 'Tarjeta de debito', true) ON CONFLICT (id) DO NOTHING")
+conn.run("INSERT INTO forma_pago (id, nombre, activo) VALUES (3, 'Efectivo', true) ON CONFLICT (id) DO NOTHING")
 print("Formas pago seeded")
 
 # Verify
