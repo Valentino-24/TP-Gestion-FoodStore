@@ -1,9 +1,5 @@
-import { Outlet } from 'react-router-dom'
-
-export default function LayoutPublic() {
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <Outlet />
-    </div>
-  )
-}
+/**
+ * @deprecated Import from `@/widgets/LayoutPublic` instead.
+ * Kept for backward compatibility during FSD migration.
+ */
+export { default } from '@/widgets/LayoutPublic'

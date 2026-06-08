@@ -9,6 +9,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
 from app.database import engine, Base
+from app.core.error_handling import register_error_handlers
 
 
 # Rate limiter
@@ -39,6 +40,9 @@ def create_app() -> FastAPI:
 
     # Add rate limiter
     app.state.limiter = limiter
+
+    # Register RFC 7807 error handlers
+    register_error_handlers(app)
 
     # Exception handler for rate limiting
     @app.exception_handler(RateLimitExceeded)
@@ -73,6 +77,7 @@ def create_app() -> FastAPI:
     from app.pedidos.router import router as pedidos_router
     from app.pagos.router import router as pagos_router
     from app.admin.router import router as admin_router
+    from app.cocina.router import router as cocina_router
 
     app.include_router(auth_router, prefix=settings.API_PREFIX)
     app.include_router(categorias_router, prefix=settings.API_PREFIX)
@@ -83,6 +88,7 @@ def create_app() -> FastAPI:
     app.include_router(pedidos_router, prefix=settings.API_PREFIX)
     app.include_router(pagos_router, prefix=settings.API_PREFIX)
     app.include_router(admin_router, prefix=settings.API_PREFIX)
+    app.include_router(cocina_router, prefix=settings.API_PREFIX)
 
     return app
 

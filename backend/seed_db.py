@@ -27,6 +27,9 @@ conn.run("""
 conn.run("""
     INSERT INTO rol (id, nombre, descripcion) VALUES (4, 'CLIENT', 'Cliente final') ON CONFLICT (id) DO NOTHING
 """)
+conn.run("""
+    INSERT INTO rol (id, nombre, descripcion) VALUES (5, 'COCINA', 'Cocinero') ON CONFLICT (id) DO NOTHING
+""")
 print("Roles seeded")
 
 # Seed estados
@@ -47,6 +50,20 @@ conn.run("INSERT INTO forma_pago (id, nombre, activo) VALUES (1, 'Tarjeta de cre
 conn.run("INSERT INTO forma_pago (id, nombre, activo) VALUES (2, 'Tarjeta de debito', true) ON CONFLICT (id) DO NOTHING")
 conn.run("INSERT INTO forma_pago (id, nombre, activo) VALUES (3, 'Efectivo', true) ON CONFLICT (id) DO NOTHING")
 print("Formas pago seeded")
+
+# Seed COCINA test user
+conn.run("""
+    INSERT INTO usuario (id, nombre, apellido, email, password_hash)
+    VALUES (999, 'Cocina', 'Test', 'cocina@foodstore.com',
+            '$2b$12$LJ3m4ys3Lk0TSwHhOZg7QuZ4X1RsVve0I.NMFYpM7GhF5y6TO.Ve')
+    ON CONFLICT (email) DO NOTHING
+""")
+conn.run("""
+    INSERT INTO usuario_rol (usuario_id, rol_id)
+    VALUES (999, 5)
+    ON CONFLICT (usuario_id, rol_id) DO NOTHING
+""")
+print("COCINA test user seeded")
 
 # Verify
 result = conn.run("SELECT * FROM rol ORDER BY id")

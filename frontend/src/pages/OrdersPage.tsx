@@ -1,31 +1,5 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import apiClient from '@/lib/apiClient'
-
-// ── Types ──────────────────────────────────────────────────────
-
-interface PedidoItemResumen {
-  id: number
-  producto_nombre: string
-  cantidad: number
-  precio_unitario: number
-  subtotal: number
-}
-
-interface PedidoResumen {
-  id: number
-  total: number
-  estado: string
-  creado_en: string
-  items: PedidoItemResumen[]
-}
-
-interface PedidoListResponse {
-  items: PedidoResumen[]
-  total: number
-  page: number
-  size: number
-}
+import { usePedidos } from '@/entities/pedido/usePedidos'
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -52,31 +26,10 @@ function formatDate(dateStr: string): string {
 // ── Component ──────────────────────────────────────────────────
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<PedidoResumen[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { data, isLoading, isError } = usePedidos({ page: 1 })
+  const orders = data?.items ?? []
 
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-
-    apiClient
-      .get<PedidoListResponse>('/pedidos/', { params: { page: 1, size: 50 } })
-      .then(({ data }) => {
-        if (!cancelled) setOrders(data.items)
-      })
-      .catch(() => {
-        if (!cancelled) setError('Error al cargar los pedidos')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-
-    return () => { cancelled = true }
-  }, [])
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="space-y-3">
         <h1 className="mb-6 text-2xl font-bold text-gray-900">Mis Pedidos</h1>
@@ -87,10 +40,10 @@ export default function OrdersPage() {
     )
   }
 
-  if (error) {
+  if (isError) {
     return (
       <div className="rounded-lg bg-red-50 p-6 text-center">
-        <p className="text-red-700">{error}</p>
+        <p className="text-red-700">Error al cargar los pedidos</p>
       </div>
     )
   }

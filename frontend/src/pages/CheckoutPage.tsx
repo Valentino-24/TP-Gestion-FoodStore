@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import apiClient from '@/lib/apiClient'
 import { useCart } from '@/hooks/useCart'
+import { useCrearPedido } from '@/entities/pedido/usePedidos'
 import AddressForm, { type AddressFormData } from '@/components/AddressForm'
 
 // ── Types ──────────────────────────────────────────────────────
@@ -16,13 +18,6 @@ interface Direccion {
   telefono_contacto: string | null
 }
 
-interface PedidoResponse {
-  id: number
-  total: number
-  estado: string
-  items: Array<{ id: number; producto_nombre: string; cantidad: number; precio_unitario: number; subtotal: number }>
-}
-
 // Hardcoded formas de pago (no hay endpoint público para listarlas)
 const FORMAS_PAGO = [
   { id: 1, nombre: 'Tarjeta de crédito' },
@@ -34,36 +29,29 @@ const FORMAS_PAGO = [
 
 export default function CheckoutPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { items, totalItems, subtotal, clearCart } = useCart()
+  const { mutateAsync: crearPedido, isPending: submitting } = useCrearPedido()
 
-  const [addresses, setAddresses] = useState<Direccion[]>([])
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null)
   const [selectedFormaPagoId, setSelectedFormaPagoId] = useState<number>(1)
   const [showAddressForm, setShowAddressForm] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Load addresses
+  const { data: addresses = [], isLoading } = useQuery({
+    queryKey: ['direcciones'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<Direccion[]>('/direcciones/')
+      return data
+    },
+  })
+
+  // Auto-select first address when loaded
   useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    apiClient
-      .get<Direccion[]>('/direcciones/')
-      .then(({ data }) => {
-        if (!cancelled) {
-          setAddresses(data)
-          if (data.length > 0) setSelectedAddressId(data[0].id)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setError('Error al cargar direcciones')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => { cancelled = true }
-  }, [])
+    if (addresses.length > 0 && selectedAddressId === null) {
+      setSelectedAddressId(addresses[0].id)
+    }
+  }, [addresses, selectedAddressId])
 
   // Redirect if cart is empty
   if (items.length === 0) {
@@ -86,7 +74,7 @@ export default function CheckoutPage() {
     try {
       const res = await apiClient.post<Direccion>('/direcciones/', data)
       const newAddress = res.data
-      setAddresses((prev) => [...prev, newAddress])
+      queryClient.setQueryData<Direccion[]>(['direcciones'], (prev) => [...(prev ?? []), newAddress])
       setSelectedAddressId(newAddress.id)
       setShowAddressForm(false)
     } catch {
@@ -100,7 +88,6 @@ export default function CheckoutPage() {
       return
     }
 
-    setSubmitting(true)
     setError(null)
 
     try {
@@ -115,13 +102,13 @@ export default function CheckoutPage() {
         forma_pago_id: selectedFormaPagoId,
       }
 
-      const { data } = await apiClient.post<PedidoResponse>('/pedidos/', payload)
+      const pedido = await crearPedido(payload)
       clearCart()
       // Redirect según forma de pago: Efectivo → pedidos, Tarjeta → pago
       if (selectedFormaPagoId === 3) {
-        navigate(`/pedidos/${data.id}`)
+        navigate(`/pedidos/${pedido.id}`)
       } else {
-        navigate(`/pago/${data.id}`)
+        navigate(`/pago/${pedido.id}`)
       }
     } catch (err: unknown) {
       const msg =
@@ -129,8 +116,6 @@ export default function CheckoutPage() {
           ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Error al crear el pedido'
           : 'Error de conexión'
       setError(msg)
-    } finally {
-      setSubmitting(false)
     }
   }
 
@@ -147,7 +132,7 @@ export default function CheckoutPage() {
           <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="mb-4 text-lg font-semibold text-gray-900">Dirección de envío</h2>
 
-            {loading ? (
+            {isLoading ? (
               <div className="h-20 animate-pulse rounded-lg bg-gray-100" />
             ) : showAddressForm ? (
               <AddressForm

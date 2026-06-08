@@ -1,13 +1,5 @@
-import { Outlet } from 'react-router-dom'
-import Navbar from '@/components/Navbar'
-
-export default function LayoutAuth() {
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <Outlet />
-      </main>
-    </div>
-  )
-}
+/**
+ * @deprecated Import from `@/widgets/LayoutAuth` instead.
+ * Kept for backward compatibility during FSD migration.
+ */
+export { default } from '@/widgets/LayoutAuth'

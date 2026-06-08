@@ -1,6 +1,6 @@
 """Auth router — registration, login, and user profile endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -12,6 +12,7 @@ from app.auth.schemas import (
     UserResponse,
 )
 from app.auth.service import AuthService
+from app.core.cookies import set_auth_cookies
 from app.database import AsyncSession, get_db
 from app.dependencies import CurrentUser
 from app.refreshtokens.repository import RefreshTokenRepository
@@ -42,14 +43,18 @@ def _get_auth_service(db: AsyncSession) -> AuthService:
 async def register(
     request: Request,
     data: RegisterRequest,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ):
     """Register a new user with automatic CLIENT role assignment.
 
     Returns access and refresh tokens on success.
+    Tokens are also set as httpOnly cookies for automatic inclusion.
     """
     service = _get_auth_service(db)
-    return await service.register(data)
+    tokens = await service.register(data)
+    set_auth_cookies(response, tokens.access_token, tokens.refresh_token)
+    return tokens
 
 
 @router.post(
@@ -61,15 +66,19 @@ async def register(
 async def login(
     request: Request,
     data: LoginRequest,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ):
     """Authenticate with email and password.
 
     Returns a generic error for invalid credentials (security).
     Rate limited: 5 attempts per IP per 15 minutes.
+    Tokens are also set as httpOnly cookies for automatic inclusion.
     """
     service = _get_auth_service(db)
-    return await service.login(data)
+    tokens = await service.login(data)
+    set_auth_cookies(response, tokens.access_token, tokens.refresh_token)
+    return tokens
 
 
 @router.get(

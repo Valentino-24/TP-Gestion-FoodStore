@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     MP_ACCESS_TOKEN: str = ""
     MP_PUBLIC_KEY: str = ""
 
+    # Cookies
+    COOKIE_SECURE: bool = False  # Set to True in production (HTTPS)
+
     # CORS
     CORS_ORIGINS: list[str] = ["http://localhost:5173"]
 

@@ -36,6 +36,20 @@ class PedidoItemResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class HistorialEstadoResponse(BaseModel):
+    """Response with historial estado data."""
+
+    id: int
+    pedido_id: int
+    estado_desde: Optional[str] = None
+    estado_hasta: str
+    usuario_id: Optional[int] = None
+    observacion: Optional[str] = None
+    creado_en: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class PedidoResponse(BaseModel):
     """Response with pedido data including items."""
 
@@ -44,10 +58,12 @@ class PedidoResponse(BaseModel):
     estado: str
     total: float
     direccion_id: Optional[int] = None
+    direccion_snapshot: Optional[str] = None
     forma_pago_id: Optional[int] = None
     creado_en: datetime
     actualizado_en: datetime
     items: list[PedidoItemResponse] = []
+    historial: list[HistorialEstadoResponse] = []
 
     model_config = {"from_attributes": True}
 

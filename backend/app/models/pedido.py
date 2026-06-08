@@ -3,12 +3,13 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import String, DateTime, func, Column, Integer, Float, ForeignKey
+from sqlalchemy import String, DateTime, func, Column, Integer, Float, ForeignKey, Text
 from sqlmodel import SQLModel, Field, Relationship
 
 if TYPE_CHECKING:
     from app.models.pedido_item import PedidoItem
     from app.models.pago import Pago
+    from app.models.historial_estado import HistorialEstado
 
 
 # Valid state transitions
@@ -44,6 +45,9 @@ class Pedido(SQLModel, table=True):
     direccion_id: Optional[int] = Field(
         sa_column=Column(Integer, ForeignKey("direccion.id"), nullable=True)
     )
+    direccion_snapshot: Optional[str] = Field(
+        sa_column=Column(Text, nullable=True, default=None)
+    )
     forma_pago_id: Optional[int] = Field(
         sa_column=Column(Integer, ForeignKey("forma_pago.id"), nullable=True)
     )
@@ -66,5 +70,8 @@ class Pedido(SQLModel, table=True):
     )
     pagos: list["Pago"] = Relationship(
         back_populates="pedido",
+        sa_relationship_kwargs={"lazy": "selectin"},
+    )
+    historial: list["HistorialEstado"] = Relationship(
         sa_relationship_kwargs={"lazy": "selectin"},
     )

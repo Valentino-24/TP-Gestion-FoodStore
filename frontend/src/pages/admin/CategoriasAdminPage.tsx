@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import apiClient from '@/lib/apiClient'
 
 // ── Types ──────────────────────────────────────────────────────
@@ -20,69 +21,83 @@ const emptyForm: CategoriaFormData = { nombre: '', descripcion: '' }
 // ── Component ──────────────────────────────────────────────────
 
 export default function CategoriasAdminPage() {
-  const [categorias, setCategorias] = useState<Categoria[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [form, setForm] = useState<CategoriaFormData>(emptyForm)
-  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => { load() }, [])
-
-  async function load() {
-    setLoading(true)
-    setError(null)
-    try {
+  const { data: categorias, isLoading } = useQuery({
+    queryKey: ['categorias', 'admin'],
+    queryFn: async () => {
       const { data } = await apiClient.get<Categoria[]>('/categorias/')
-      setCategorias(data)
-    } catch {
-      setError('Error al cargar categorías')
-    } finally {
-      setLoading(false)
-    }
-  }
+      return data
+    },
+  })
+
+  const createMutation = useMutation({
+    mutationFn: async (payload: Record<string, unknown>) => {
+      const { data } = await apiClient.post<Categoria>('/categorias/', payload)
+      return data
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['categorias'] }),
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, ...payload }: Record<string, unknown> & { id: number }) => {
+      const { data } = await apiClient.put<Categoria>(`/categorias/${id}`, payload)
+      return data
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['categorias'] }),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiClient.delete(`/categorias/${id}`)
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['categorias'] }),
+  })
+
+  const isSaving = createMutation.isPending || updateMutation.isPending
 
   function openCreate() {
     setEditingId(null)
     setForm(emptyForm)
+    setError(null)
     setShowModal(true)
   }
 
   function openEdit(c: Categoria) {
     setEditingId(c.id)
     setForm({ nombre: c.nombre, descripcion: c.descripcion ?? '' })
+    setError(null)
     setShowModal(true)
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    setSaving(true)
+    setError(null)
     try {
       const payload = { nombre: form.nombre, descripcion: form.descripcion || null }
       if (editingId) {
-        await apiClient.put(`/categorias/${editingId}`, payload)
+        await updateMutation.mutateAsync({ id: editingId, ...payload })
       } else {
-        await apiClient.post('/categorias/', payload)
+        await createMutation.mutateAsync(payload)
       }
       setShowModal(false)
-      await load()
     } catch (err: unknown) {
       const msg =
         err && typeof err === 'object' && 'response' in err
           ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Error al guardar'
           : 'Error de conexión'
       setError(msg)
-    } finally {
-      setSaving(false)
     }
   }
 
   async function handleDelete(id: number) {
     if (!confirm('¿Eliminar esta categoría?')) return
     try {
-      await apiClient.delete(`/categorias/${id}`)
-      await load()
+      await deleteMutation.mutateAsync(id)
     } catch {
       setError('Error al eliminar la categoría')
     }
@@ -110,7 +125,7 @@ export default function CategoriasAdminPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {loading ? (
+            {isLoading ? (
               Array.from({ length: 3 }).map((_, i) => (
                 <tr key={i}>
                   {Array.from({ length: 4 }).map((_, j) => (
@@ -118,12 +133,12 @@ export default function CategoriasAdminPage() {
                   ))}
                 </tr>
               ))
-            ) : categorias.length === 0 ? (
+            ) : (categorias ?? []).length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-4 py-12 text-center text-gray-500">No hay categorías</td>
               </tr>
             ) : (
-              categorias.map((c) => (
+              (categorias ?? []).map((c) => (
                 <tr key={c.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">{c.nombre}</td>
                   <td className="px-4 py-3 text-gray-600">{c.descripcion ?? '—'}</td>
@@ -166,9 +181,9 @@ export default function CategoriasAdminPage() {
               <div className="flex justify-end gap-3">
                 <button type="button" onClick={() => setShowModal(false)}
                   className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancelar</button>
-                <button type="submit" disabled={saving}
+                <button type="submit" disabled={isSaving}
                   className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
-                  {saving ? 'Guardando...' : editingId ? 'Actualizar' : 'Crear'}
+                  {isSaving ? 'Guardando...' : editingId ? 'Actualizar' : 'Crear'}
                 </button>
               </div>
             </form>

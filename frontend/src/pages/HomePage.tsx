@@ -1,16 +1,14 @@
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
-import { useProducts } from '@/hooks/useProducts'
+import { useProductosDestacados } from '@/entities/producto/useProductos'
 import ProductGrid from '@/components/ProductGrid'
 
 export default function HomePage() {
   const { user } = useAuthStore()
-  // Fetch first 4 products for featured section
-  const { products, loading, error } = useProducts(4)
+  const { data: products, isLoading, isError } = useProductosDestacados()
 
   return (
     <div>
-      {/* Welcome section */}
       <div className="py-8 text-center">
         <h1 className="text-3xl font-bold text-gray-900">
           Bienvenido, {user?.nombre}!
@@ -20,7 +18,6 @@ export default function HomePage() {
         </p>
       </div>
 
-      {/* Featured products */}
       <div className="mt-8">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-bold text-gray-900">Productos destacados</h2>
@@ -32,7 +29,7 @@ export default function HomePage() {
           </Link>
         </div>
 
-        {loading && (
+        {isLoading && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="h-56 animate-pulse rounded-xl bg-gray-100" />
@@ -40,11 +37,11 @@ export default function HomePage() {
           </div>
         )}
 
-        {error && (
+        {isError && (
           <p className="text-sm text-gray-500">No se pudieron cargar los productos destacados.</p>
         )}
 
-        {!loading && !error && <ProductGrid products={products} />}
+        {!isLoading && !isError && <ProductGrid products={products ?? []} />}
       </div>
     </div>
   )

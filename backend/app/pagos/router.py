@@ -9,6 +9,7 @@ from app.pagos.schemas import PagoCreate, PagoResponse, PagoWebhookPayload
 from app.pagos.service import PagoService
 from app.pedidos.service import PedidoService
 from app.pedidos.repository import PedidoRepository
+from app.cocina.event_manager import event_manager
 
 router = APIRouter(prefix="/pagos", tags=["pagos"])
 
@@ -17,7 +18,10 @@ def _get_services(db: AsyncSession) -> tuple[PagoService, PedidoService]:
     """Construct services with their dependencies."""
     pago_repo = PagoRepository(db)
     pedido_repo = PedidoRepository(db)
-    return PagoService(pago_repo, db), PedidoService(pedido_repo)
+    return (
+        PagoService(pago_repo, db, event_manager=event_manager),
+        PedidoService(pedido_repo, db),
+    )
 
 
 @router.post("/", response_model=PagoResponse, status_code=status.HTTP_201_CREATED)

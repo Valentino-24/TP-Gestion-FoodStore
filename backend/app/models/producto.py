@@ -25,6 +25,9 @@ class Producto(SQLModel, table=True):
         sa_column=Column(String(500), default=None, nullable=True)
     )
     activo: bool = Field(sa_column=Column(Boolean, default=True, nullable=False))
+    stock_cantidad: Optional[int] = Field(
+        sa_column=Column(Integer, default=0, nullable=True)
+    )
     creado_en: datetime = Field(
         sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     )

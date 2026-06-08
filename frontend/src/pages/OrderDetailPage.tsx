@@ -1,38 +1,8 @@
-import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import apiClient from '@/lib/apiClient'
-
-// ── Types ──────────────────────────────────────────────────────
-
-interface PedidoItemDetalle {
-  id: number
-  producto_id: number
-  producto_nombre: string
-  cantidad: number
-  precio_unitario: number
-  subtotal: number
-}
-
-interface PedidoDetalle {
-  id: number
-  total: number
-  estado: string
-  direccion_id: number | null
-  forma_pago_id: number | null
-  creado_en: string
-  actualizado_en: string
-  items: PedidoItemDetalle[]
-}
-
-interface DireccionDetalle {
-  id: number
-  calle: string
-  numero: string
-  ciudad: string
-  provincia: string
-  codigo_postal: string
-  telefono_contacto: string | null
-}
+import { useQuery } from '@tanstack/react-query'
+import { usePedido } from '@/entities/pedido/usePedidos'
+import type { Direccion } from '@/shared/types'
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -60,42 +30,20 @@ function formatDate(dateStr: string): string {
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const [pedido, setPedido] = useState<PedidoDetalle | null>(null)
-  const [direccion, setDireccion] = useState<DireccionDetalle | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const pedidoId = Number(id)
+  const { data: pedido, isLoading, isError } = usePedido(pedidoId)
 
-  useEffect(() => {
-    if (!id) return
-    let cancelled = false
+  // Load address separately
+  const { data: direccion } = useQuery({
+    queryKey: ['direcciones', pedido?.direccion_id],
+    queryFn: async () => {
+      const { data } = await apiClient.get<Direccion>(`/direcciones/${pedido!.direccion_id}`)
+      return data
+    },
+    enabled: !!pedido?.direccion_id,
+  })
 
-    async function load() {
-      try {
-        const { data } = await apiClient.get<PedidoDetalle>(`/pedidos/${id}`)
-        if (cancelled) return
-        setPedido(data)
-
-        // Load address if available
-        if (data.direccion_id) {
-          try {
-            const addrRes = await apiClient.get<DireccionDetalle>(`/direcciones/${data.direccion_id}`)
-            if (!cancelled) setDireccion(addrRes.data)
-          } catch {
-            // Address fetch failed silently — non-critical
-          }
-        }
-      } catch {
-        if (!cancelled) setError('Pedido no encontrado')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    load()
-    return () => { cancelled = true }
-  }, [id])
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
@@ -103,7 +51,7 @@ export default function OrderDetailPage() {
     )
   }
 
-  if (error || !pedido) {
+  if (isError || !pedido) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <h1 className="text-2xl font-bold text-gray-900">Pedido no encontrado</h1>

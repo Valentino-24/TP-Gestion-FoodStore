@@ -1,7 +1,12 @@
-import axios, {
-  AxiosError,
-  InternalAxiosRequestConfig,
-} from 'axios'
+/**
+ * Axios HTTP client with httpOnly cookie auth.
+ *
+ * The access_token and refresh_token are stored as httpOnly cookies
+ * by the backend. The browser sends them automatically with every
+ * request (withCredentials: true). The frontend never touches them.
+ */
+
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 
@@ -10,41 +15,7 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-})
-
-// ── Token helpers ──────────────────────────────────────────────
-
-const TOKEN_KEYS = {
-  access: 'access_token',
-  refresh: 'refresh_token',
-} as const
-
-export function getStoredAccessToken(): string | null {
-  return localStorage.getItem(TOKEN_KEYS.access)
-}
-
-export function getStoredRefreshToken(): string | null {
-  return localStorage.getItem(TOKEN_KEYS.refresh)
-}
-
-export function storeTokens(access: string, refresh: string): void {
-  localStorage.setItem(TOKEN_KEYS.access, access)
-  localStorage.setItem(TOKEN_KEYS.refresh, refresh)
-}
-
-export function clearTokens(): void {
-  localStorage.removeItem(TOKEN_KEYS.access)
-  localStorage.removeItem(TOKEN_KEYS.refresh)
-}
-
-// ── Request interceptor ────────────────────────────────────────
-
-apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = getStoredAccessToken()
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
+  withCredentials: true,  // Send cookies automatically
 })
 
 // ── Response interceptor (auto-refresh on 401) ─────────────────
@@ -88,8 +59,7 @@ apiClient.interceptors.response.use(
     if (isRefreshing) {
       return new Promise<string>((resolve, reject) => {
         pendingQueue.push({ resolve, reject })
-      }).then((token) => {
-        originalRequest.headers.Authorization = `Bearer ${token}`
+      }).then(() => {
         return apiClient(originalRequest)
       })
     }
@@ -97,29 +67,20 @@ apiClient.interceptors.response.use(
     originalRequest._retry = true
     isRefreshing = true
 
-    const refreshToken = getStoredRefreshToken()
-    if (!refreshToken) {
-      isRefreshing = false
-      clearTokens()
-      window.location.href = '/login'
-      return Promise.reject(error)
-    }
-
     try {
+      // The refresh_token cookie is sent automatically
       const { data } = await axios.post<TokenRefreshResponse>(
         `${API_URL}/auth/refresh`,
-        { refresh_token: refreshToken },
+        {},
+        { withCredentials: true },
       )
 
-      storeTokens(data.access_token, data.refresh_token)
       processQueue(null, data.access_token)
-
-      originalRequest.headers.Authorization = `Bearer ${data.access_token}`
       return apiClient(originalRequest)
     } catch (refreshError) {
       processQueue(refreshError, null)
-      clearTokens()
-      window.location.href = '/login'
+      // Don't redirect here — the calling code (authStore.hydrate etc.)
+      // handles 401s gracefully. Redirecting would cause a loop on /login.
       return Promise.reject(refreshError)
     } finally {
       isRefreshing = false

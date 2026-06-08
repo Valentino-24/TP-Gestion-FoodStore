@@ -5,6 +5,7 @@ import LayoutAuth from '@/components/LayoutAuth'
 import LayoutAdmin from '@/components/LayoutAdmin'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import AdminRoute from '@/components/AdminRoute'
+import CocinaRoute from '@/components/CocinaRoute'
 
 import LoginPage from '@/pages/LoginPage'
 import RegisterPage from '@/pages/RegisterPage'
@@ -23,6 +24,9 @@ import ProductosAdminPage from '@/pages/admin/ProductosAdminPage'
 import CategoriasAdminPage from '@/pages/admin/CategoriasAdminPage'
 import ClientesAdminPage from '@/pages/admin/ClientesAdminPage'
 import PedidosAdminPage from '@/pages/admin/PedidosAdminPage'
+
+import { KDSLayout } from '@/features/cocina/KDSLayout'
+import { KDSPage } from '@/features/cocina/KDSPage'
 
 const router = createBrowserRouter([
   {
@@ -66,6 +70,18 @@ const router = createBrowserRouter([
           { path: '/admin/categorias', element: <CategoriasAdminPage /> },
           { path: '/admin/clientes', element: <ClientesAdminPage /> },
           { path: '/admin/pedidos', element: <PedidosAdminPage /> },
+        ],
+      },
+    ],
+  },
+  {
+    // KDS routes (COCINA / PEDIDOS / ADMIN role required)
+    element: <CocinaRoute />,
+    children: [
+      {
+        element: <KDSLayout />,
+        children: [
+          { path: '/cocina', element: <KDSPage /> },
         ],
       },
     ],

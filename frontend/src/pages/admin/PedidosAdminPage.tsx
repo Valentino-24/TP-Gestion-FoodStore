@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import apiClient from '@/lib/apiClient'
+import { useCambiarEstadoPedido } from '@/entities/pedido/usePedidos'
 
 // ── Types ──────────────────────────────────────────────────────
 
-interface Pedido {
+interface PedidoRow {
   id: number
   usuario_id: number
   estado: string
@@ -12,10 +14,11 @@ interface Pedido {
 }
 
 interface PedidoListResponse {
-  items: Pedido[]
+  items: PedidoRow[]
   total: number
   page: number
   size: number
+  pages: number
 }
 
 // ── FSM transitions (mirrors backend app/models/pedido.py) ──────
@@ -50,50 +53,36 @@ function formatDate(dateStr: string): string {
 // ── Component ──────────────────────────────────────────────────
 
 export default function PedidosAdminPage() {
-  const [pedidos, setPedidos] = useState<Pedido[]>([])
-  const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [estadoFilter, setEstadoFilter] = useState<string>('')
-  const [updatingId, setUpdatingId] = useState<number | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const size = 20
 
-  useEffect(() => {
-    loadPedidos()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, estadoFilter])
-
-  async function loadPedidos() {
-    setLoading(true)
-    setError(null)
-    try {
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin', 'pedidos', { page, estadoFilter }],
+    queryFn: async () => {
       const params: Record<string, string | number> = { page, size }
       if (estadoFilter) params.estado = estadoFilter
       const { data } = await apiClient.get<PedidoListResponse>('/pedidos/', { params })
-      setPedidos(data.items)
-      setTotal(data.total)
-    } catch {
-      setError('Error al cargar pedidos')
-    } finally {
-      setLoading(false)
-    }
-  }
+      return data
+    },
+  })
+
+  const { mutateAsync: cambiarEstado, isPending: updating } = useCambiarEstadoPedido()
+
+  const pedidos = data?.items ?? []
+  const total = data?.total ?? 0
 
   async function handleTransition(pedidoId: number, targetEstado: string) {
-    setUpdatingId(pedidoId)
     setError(null)
     try {
-      await apiClient.patch(`/pedidos/${pedidoId}/estado`, { estado: targetEstado })
-      await loadPedidos()
+      await cambiarEstado({ id: pedidoId, estado: targetEstado })
     } catch (err: unknown) {
       const msg =
         err && typeof err === 'object' && 'response' in err
           ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Error al actualizar'
           : 'Error de conexión'
       setError(msg)
-    } finally {
-      setUpdatingId(null)
     }
   }
 
@@ -130,7 +119,7 @@ export default function PedidosAdminPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {loading ? (
+            {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i}>
                   {Array.from({ length: 6 }).map((_, j) => (
@@ -160,7 +149,7 @@ export default function PedidosAdminPage() {
                       {validTransitions.length > 0 ? (
                         <select
                           value=""
-                          disabled={updatingId === p.id}
+                          disabled={updating}
                           onChange={(e) => {
                             if (e.target.value) handleTransition(p.id, e.target.value)
                           }}
@@ -183,7 +172,7 @@ export default function PedidosAdminPage() {
         </table>
       </div>
 
-      {!loading && totalPages > 1 && (
+      {!isLoading && totalPages > 1 && (
         <div className="mt-4 flex items-center justify-between text-sm">
           <span className="text-gray-600">Página {page} de {totalPages} ({total} pedidos)</span>
           <div className="flex gap-2">

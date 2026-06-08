@@ -19,6 +19,7 @@ ROLES = [
     (2, "STOCK", "Gestor de stock e inventario"),
     (3, "PEDIDOS", "Gestor de pedidos"),
     (4, "CLIENT", "Cliente final"),
+    (5, "COCINA", "Cocinero"),
 ]
 
 ESTADOS_PEDIDO = [
@@ -172,6 +173,33 @@ def seed_clientes(conn):
             """), {"id": cli[0], "nombre": cli[1], "apellido": cli[2], "email": cli[3], "telefono": cli[4], "direccion": cli[5]})
 
 
+def seed_usuarios_cocina(conn):
+    """Seed COCINA test user (idempotent)."""
+    from app.core.security import get_password_hash
+    with conn.begin():
+        conn.execute(text("""
+            INSERT INTO usuario (id, nombre, apellido, email, password_hash)
+            VALUES (:id, :nombre, :apellido, :email, :password_hash)
+            ON CONFLICT (email) DO NOTHING
+        """), {
+            "id": 999,
+            "nombre": "Cocina",
+            "apellido": "Test",
+            "email": "cocina@foodstore.com",
+            "password_hash": get_password_hash("cocina123"),
+        })
+
+
+def seed_usuario_rol_cocina(conn):
+    """Link test user to COCINA role."""
+    with conn.begin():
+        conn.execute(text("""
+            INSERT INTO usuario_rol (usuario_id, rol_id)
+            VALUES (999, 5)
+            ON CONFLICT (usuario_id, rol_id) DO NOTHING
+        """))
+
+
 def run_seed():
     """Run all seeds."""
     # Read DATABASE_URL from environment (same as app config uses)
@@ -210,6 +238,14 @@ def run_seed():
         with engine.connect() as conn:
             seed_clientes(conn)
         print("✓ Seeded clientes")
+
+        with engine.connect() as conn:
+            seed_usuarios_cocina(conn)
+        print("✓ Seeded COCINA test user")
+
+        with engine.connect() as conn:
+            seed_usuario_rol_cocina(conn)
+        print("✓ Seeded COCINA role assignment")
 
         # Verify
         with engine.connect() as conn:

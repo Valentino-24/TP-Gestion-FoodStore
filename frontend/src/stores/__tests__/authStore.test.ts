@@ -2,7 +2,8 @@
  * Tests for authStore (Zustand).
  *
  * These tests verify the store's state management directly,
- * without mocking API calls.
+ * without mocking API calls. Tokens are managed via httpOnly cookies
+ * by the backend, so the store only tracks user state.
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
@@ -13,10 +14,6 @@ vi.mock('@/lib/apiClient', () => ({
     post: vi.fn(),
     get: vi.fn(),
   },
-  storeTokens: vi.fn(),
-  clearTokens: vi.fn(),
-  getStoredAccessToken: vi.fn(),
-  getStoredRefreshToken: vi.fn(),
 }))
 
 // Mock window.location
@@ -27,38 +24,34 @@ Object.defineProperty(window, 'location', {
 })
 
 import { useAuthStore } from '../authStore'
-import { storeTokens, clearTokens, getStoredAccessToken, getStoredRefreshToken } from '@/lib/apiClient'
 
 describe('authStore', () => {
   beforeEach(() => {
     // Reset store state
     useAuthStore.setState({
       user: null,
-      accessToken: null,
-      refreshToken: null,
       isAuthenticated: false,
       isLoading: false,
       error: null,
     })
     vi.clearAllMocks()
     mockLocation.href = ''
-    localStorage.clear()
   })
 
   describe('login', () => {
     it('updates state on success', async () => {
+      // Mock both calls: POST /login succeeds, GET /me returns user
       const mockApiClient = (await import('@/lib/apiClient')).default
-      ;(mockApiClient.post as any).mockResolvedValue({
+      ;(mockApiClient.post as any).mockResolvedValue({ data: {} })
+      ;(mockApiClient.get as any).mockResolvedValue({
         data: {
-          access_token: 'test-access-token',
-          refresh_token: 'test-refresh-token',
-          token_type: 'bearer',
-          expires_in: 1800,
+          id: 1,
+          nombre: 'Test',
+          apellido: 'User',
+          email: 'test@test.com',
+          roles: ['CLIENT'],
         },
       })
-      // Mock hydrate to avoid API call
-      const store = useAuthStore.getState()
-      vi.spyOn(store, 'hydrate').mockResolvedValue()
 
       await useAuthStore.getState().login({ email: 'test@test.com', password: 'password123' })
 
@@ -66,6 +59,8 @@ describe('authStore', () => {
       expect(state.isAuthenticated).toBe(true)
       expect(state.isLoading).toBe(false)
       expect(state.error).toBeNull()
+      expect(state.user).not.toBeNull()
+      expect(state.user!.email).toBe('test@test.com')
     })
 
     it('sets error on failure', async () => {
@@ -88,19 +83,19 @@ describe('authStore', () => {
   describe('register', () => {
     it('updates state on success', async () => {
       const mockApiClient = (await import('@/lib/apiClient')).default
-      ;(mockApiClient.post as any).mockResolvedValue({
+      ;(mockApiClient.post as any).mockResolvedValue({ data: {} })
+      ;(mockApiClient.get as any).mockResolvedValue({
         data: {
-          access_token: 'reg-access-token',
-          refresh_token: 'reg-refresh-token',
-          token_type: 'bearer',
-          expires_in: 1800,
+          id: 2,
+          nombre: 'New',
+          apellido: 'User',
+          email: 'new@test.com',
+          roles: ['CLIENT'],
         },
       })
-      const store = useAuthStore.getState()
-      vi.spyOn(store, 'hydrate').mockResolvedValue()
 
       await useAuthStore.getState().register({
-        nombre: 'Test',
+        nombre: 'New',
         apellido: 'User',
         email: 'new@test.com',
         password: 'password123',
@@ -109,6 +104,8 @@ describe('authStore', () => {
       const state = useAuthStore.getState()
       expect(state.isAuthenticated).toBe(true)
       expect(state.isLoading).toBe(false)
+      expect(state.user).not.toBeNull()
+      expect(state.user!.email).toBe('new@test.com')
     })
   })
 
@@ -117,8 +114,7 @@ describe('authStore', () => {
       // Set authenticated state first
       useAuthStore.setState({
         isAuthenticated: true,
-        accessToken: 'some-token',
-        refreshToken: 'some-refresh',
+        user: { id: 1, nombre: 'T', apellido: 'U', email: 't@t.com', roles: ['CLIENT'] },
       })
 
       await useAuthStore.getState().logout()
@@ -126,8 +122,6 @@ describe('authStore', () => {
       const state = useAuthStore.getState()
       expect(state.isAuthenticated).toBe(false)
       expect(state.user).toBeNull()
-      expect(state.accessToken).toBeNull()
-      expect(state.refreshToken).toBeNull()
     })
   })
 })

@@ -28,6 +28,7 @@ const baseProduct = {
   categoria_id: 1,
   imagen_url: 'http://example.com/coke.jpg',
   activo: true,
+  disponible: true,
   creado_en: '2024-01-01T00:00:00Z',
   actualizado_en: '2024-01-01T00:00:00Z',
 }

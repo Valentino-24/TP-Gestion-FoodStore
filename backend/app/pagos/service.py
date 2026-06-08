@@ -8,18 +8,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.models.pago import Pago
+from app.models.historial_estado import HistorialEstado
 from app.models.pedido import Pedido, can_transition
 from app.pagos.repository import PagoRepository
 from app.pagos.schemas import PagoCreate
+from app.cocina.event_manager import EventManager, KitchenEvent, event_manager as default_event_manager
 
 
 class PagoService:
     """Service layer for payment processing with MercadoPago."""
 
-    def __init__(self, repo: PagoRepository, db: AsyncSession):
+    def __init__(
+        self,
+        repo: PagoRepository,
+        db: AsyncSession,
+        event_manager: Optional[EventManager] = None,
+    ):
         """Initialize with repository and db dependencies."""
         self.repo = repo
         self.db = db
+        self.event_manager = event_manager
 
     async def create_payment(self, data: PagoCreate, pedido: Pedido) -> Pago:
         """Initiate a payment for a pedido using MercadoPago SDK.
@@ -98,9 +106,33 @@ class PagoService:
 
         # If payment approved, transition pedido to CONFIRMADO
         if pago_estado == "aprobado" and can_transition(pedido.estado, "CONFIRMADO"):
+            from_state = pedido.estado
             pedido.estado = "CONFIRMADO"
             pedido.actualizado_en = datetime.now(timezone.utc)
             await self.repo.update(pedido)
+
+            # Record historial for the auto-transition
+            historial = HistorialEstado(
+                pedido_id=pedido.id,
+                estado_desde=from_state,
+                estado_hasta="CONFIRMADO",
+                observacion="Pago aprobado",
+            )
+            self.db.add(historial)
+            await self.db.flush()
+
+            # Emit kitchen event if event_manager is available
+            if self.event_manager:
+                event = KitchenEvent(
+                    type="PEDIDO_CONFIRMADO",
+                    pedido_id=pedido.id,
+                    data={
+                        "pedido_id": pedido.id,
+                        "estado": "CONFIRMADO",
+                        "from_state": from_state,
+                    },
+                )
+                await self.event_manager.broadcast(EventManager.CHANNEL_KITCHEN, event)
 
         return created
 

@@ -191,18 +191,238 @@ Frontend:
 
 ---
 
+## Planificados (Nuevos Changes)
+
+```
+FRONTEND (Vite + React + TypeScript)
+══════════════════════════════════════════════════════════════
+align-with-spec ─── ingredients-module ─── ux-polish
+       │
+       └─── complete-order-fsm
+       │
+       └─── admin-enhancements
+       │
+       └─── enhance-auth-rbac
+
+BACKEND (FastAPI + PostgreSQL)
+══════════════════════════════════════════════════════════════
+complete-order-fsm ─── ingredients-module
+       │
+       └─── admin-enhancements
+       │
+       └─── enhance-auth-rbac
+```
+
+### 1. `align-with-spec` 🔴 Alta
+
+**Dependencias**: cambios activos (mp-integration, fix-core-purchase-flow, us-011-test)  
+**Descripción**: Cerrar brecha con la especificación técnica v5.0. Migrar a TanStack Query, implementar 4 stores Zustand, recharts, HistorialEstadoPedido, snapshot pattern, stock management, reorganizar a FSD.
+
+```
+TanStack Query
+├── useQuery/useMutation para todo fetching
+├── queryKeys descriptivos + invalidación automática
+├── Eliminar useEffect para datos de servidor
+└── Hooks por dominio (useProductos, usePedidos, useAdmin)
+
+Zustand 4 stores
+├── authStore ✅ (existente)
+├── cartStore ✅ (existente)
+├── paymentStore 🆕 (estado del pago)
+└── uiStore 🆕 (tema, toasts, sidebar)
+
+Dashboard
+├── recharts: ingresos semanales (línea)
+├── recharts: pedidos por estado (torta)
+└── recharts: top 5 productos (barras)
+
+HistorialEstadoPedido
+├── Modelo + repository
+├── Registro automático en cada transición
+└── Append-only (solo INSERT)
+
+Snapshots + Stock
+├── precio_snapshot en DetallePedido
+├── direccion_snapshot en Pedido
+├── Stock decrement al CONFIRMAR
+└── Stock restore al CANCELAR
+
+Feature-Sliced Design
+├── shared/ (UI, API, types, utils)
+├── entities/ (producto, pedido, cliente)
+├── features/ (auth, cart, checkout, admin)
+├── widgets/ (ProductGrid, CartDrawer, OrderTimeline)
+└── pages/ (cada página importa de widgets/features)
+```
+
+---
+
+### 2. `ingredients-module` 🔴 Alta
+
+**Dependencias**: `align-with-spec` (deseable, no blocking)  
+**Descripción**: Implementar el módulo de ingredientes y alérgenos con CRUD completo, asociación a productos, y visualización en frontend.
+
+```
+Backend
+├── Modelo Ingrediente (nombre, es_alergeno, activo)
+├── Tabla ProductoIngrediente (M2M + es_removible)
+├── CRUD /api/v1/ingredientes
+├── POST/DELETE /api/v1/productos/{id}/ingredientes
+└── Seed data con ingredientes comunes
+
+Frontend
+├── Admin: CRUD de ingredientes
+├── ProductDetailPage: ingredientes + badge alérgeno
+├── ProductListPage: filtro por exclusión de alérgenos
+└── Badge visual para alérgenos
+```
+
+---
+
+### 3. `complete-order-fsm` 🟡 Media
+
+**Dependencias**: `align-with-spec` (bloqueante — necesita HistorialEstadoPedido y stock management)  
+**Descripción**: Completar la máquina de estados del pedido con historial append-only, stock atómico, cancelación por cliente, y timeline visual.
+
+```
+Backend
+├── HistorialEstadoPedido (append-only)
+├── Stock decrement atómico al CONFIRMAR
+├── Stock restore atómico al CANCELAR
+├── Endpoint cancelar para CLIENT (solo PENDIENTE)
+
+Frontend
+├── Timeline visual en OrderDetailPage
+├── Botón "Cancelar pedido" (CLIENT, estado PENDIENTE)
+└── Transiciones completas en admin
+```
+
+---
+
+### 4. `admin-enhancements` 🟡 Media
+
+**Dependencias**: `align-with-spec` (recharts), `enhance-auth-rbac` (roles)  
+**Descripción**: Completar el panel de administración con CRUD de usuarios, gráficos, gestión de stock, filtros avanzados y exportación.
+
+```
+Dashboard
+├── Gráficos recharts (ingresos, pedidos, top productos)
+└── Cards de métricas existentes
+
+CRUD Usuarios
+├── Listar, crear, editar, desactivar
+├── Asignar roles (ADMIN, STOCK, PEDIDOS, CLIENT)
+└── Modal de confirmación
+
+Gestión stock
+├── Campo editable inline en tabla productos
+├── PATCH /api/v1/productos/{id}/stock
+
+Pedidos avanzado
+├── Filtros: fecha, estado, búsqueda por ID
+├── Exportar a CSV
+
+UX admin
+├── Modales de confirmación en acciones destructivas
+├── Skeletons en tablas
+└── Estados vacíos
+```
+
+---
+
+### 5. `enhance-auth-rbac` 🟡 Media
+
+**Dependencias**: `admin-enhancements` (UI de roles)  
+**Descripción**: Completar el sistema de autenticación y roles con asignación de roles, rate limiting multi-endpoint, navegación por rol, y páginas de error.
+
+```
+Roles
+├── Endpoint: PUT /api/v1/admin/usuarios/{id}/roles
+├── Frontend: UI de asignación de roles
+└── Validación: último ADMIN no puede quitarse rol
+
+Rate limiting
+├── Registro: 3/hora por IP
+├── Creación pedidos: 10/hora por usuario
+└── Headers X-RateLimit-*
+
+Refresh queue
+├── Cola de requests en 401 concurrentes
+├── Singleton de refresh en progreso
+└── Todas las requests pendientes se resuelven post-refresh
+
+Navegación por rol
+├── Navbar adaptada (CLIENT, STOCK, PEDIDOS, ADMIN)
+├── Sidebar admin condicional
+└── Páginas 403 y 404 dedicadas
+```
+
+---
+
+### 6. `ux-polish` 🟢 Baja
+
+**Dependencias**: ninguna (independiente)  
+**Descripción**: Mejoras de experiencia de usuario: toasts, skeletons, modo oscuro, estados vacíos, responsive.
+
+```
+Toasts
+├── ToastStore (Zustand)
+├── Componente ToastContainer
+├── Tipos: success, error, warning, info
+└── Auto-dismiss con duración configurable
+
+Skeletons
+├── ProductCard skeleton (shimmer)
+├── Tabla admin skeleton
+├── OrderDetail skeleton
+└── Profile skeleton
+
+Modo oscuro
+├── uiStore: theme (light/dark)
+├── Persistencia en localStorage
+├── Clases dark: en Tailwind
+└── ThemeToggle en navbar
+
+Estados vacíos
+├── EmptyState componente reutilizable
+├── Carrito vacío, sin pedidos, sin direcciones
+├── Sin resultados de búsqueda
+└── Ilustraciones + CTA
+
+Responsive
+├── Layout mobile para todas las páginas
+├── Menú hamburguesa en mobile
+└── Tablas responsive (scroll horizontal)
+
+Otros
+├── Debounce 300ms en búsqueda
+├── Transiciones suaves (hover, focus)
+└── Botón "Volver arriba" en listas largas
+```
+
+---
+
 ## Resumen
 
-| # | Change | Prioridad | Deps | Tasks | Estado |
-|---|--------|-----------|------|-------|--------|
-| — | `setup-infrastructure` | — | — | — | ✅ Archivado |
-| — | `us-001-auth` | — | infra | 33 | ✅ Archivado |
-| — | `us-002-categorias` | — | auth | — | ✅ Archivado |
-| — | `us-003-productos` | — | auth, cat | — | ✅ Archivado |
-| — | `us-004-clientes` | — | auth | 17 | ✅ Archivado |
-| us-005 | Frontend base | 🔴 Alta | — | 35 | ✅ Archivado |
-| us-006 | Catálogo productos | 🔴 Alta | us-005 | 19 | ✅ Archivado |
-| us-007 | Carrito + pagos | 🔴 Alta | us-005, us-006 | 40 | ✅ Archivado |
-| us-008 | Panel admin | 🟡 Media | us-005 | 8-10 | ✅ Archivado |
-| us-009 | Perfil + direcciones | 🟡 Media | us-005 | 4-5 | ✅ Archivado |
-| us-011 | Tests | 🟢 Baja | — | 8-10 | 🔄 Activo |
+| # | Change | Prioridad | Deps | Estado |
+|---|--------|-----------|------|--------|
+| — | `setup-infrastructure` | — | — | ✅ Archivado |
+| — | `us-001-auth` | — | infra | ✅ Archivado |
+| — | `us-002-categorias` | — | auth | ✅ Archivado |
+| — | `us-003-productos` | — | auth, cat | ✅ Archivado |
+| — | `us-004-clientes` | — | auth | ✅ Archivado |
+| us-005 | Frontend base | 🔴 Alta | — | ✅ Archivado |
+| us-006 | Catálogo productos | 🔴 Alta | us-005 | ✅ Archivado |
+| us-007 | Carrito + pagos | 🔴 Alta | us-005, us-006 | ✅ Archivado |
+| us-008 | Panel admin | 🟡 Media | us-005 | ✅ Archivado |
+| us-009 | Perfil + direcciones | 🟡 Media | us-005 | ✅ Archivado |
+| us-010 | Docker | — | — | 🔙 Revertido |
+| us-011 | Tests | 🟢 Baja | — | 🔄 Activo |
+| mp-integration | MP real | 🔴 Alta | us-007 | 🔄 Activo |
+| fix-core-purchase-flow | Fix flujo compra | 🔴 Alta | us-006, us-009 | 🔄 Activo |
+| **1** | `align-with-spec` | 🔴 Alta | activos | 📋 Pendiente |
+| **2** | `ingredients-module` | 🔴 Alta | 1 | 📋 Pendiente |
+| **3** | `complete-order-fsm` | 🟡 Media | 1 | 📋 Pendiente |
+| **4** | `admin-enhancements` | 🟡 Media | 1, 5 | 📋 Pendiente |
+| **5** | `enhance-auth-rbac` | 🟡 Media | 4 | 📋 Pendiente |
+| **6** | `ux-polish` | 🟢 Baja | — | 📋 Pendiente |

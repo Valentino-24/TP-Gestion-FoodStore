@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import apiClient from '@/lib/apiClient'
 
 // ── Types ──────────────────────────────────────────────────────
@@ -18,38 +19,27 @@ interface ClienteListResponse {
   total: number
   page: number
   size: number
+  pages: number
 }
 
 // ── Component ──────────────────────────────────────────────────
 
 export default function ClientesAdminPage() {
-  const [clientes, setClientes] = useState<Cliente[]>([])
-  const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const size = 20
 
-  useEffect(() => {
-    loadClientes()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page])
-
-  async function loadClientes() {
-    setLoading(true)
-    setError(null)
-    try {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['admin', 'clientes', { page }],
+    queryFn: async () => {
       const params: Record<string, string | number> = { page, size }
       const { data } = await apiClient.get<ClienteListResponse>('/clientes/', { params })
-      setClientes(data.items)
-      setTotal(data.total)
-    } catch {
-      setError('Error al cargar clientes')
-    } finally {
-      setLoading(false)
-    }
-  }
+      return data
+    },
+  })
+
+  const clientes = data?.items ?? []
+  const total = data?.total ?? 0
 
   // Simple client-side search filter
   const filtered = search.trim()
@@ -75,7 +65,7 @@ export default function ClientesAdminPage() {
         />
       </div>
 
-      {error && <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+      {isError && <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">Error al cargar clientes</div>}
 
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
         <table className="w-full text-left text-sm">
@@ -88,7 +78,7 @@ export default function ClientesAdminPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {loading ? (
+            {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i}>
                   {Array.from({ length: 4 }).map((_, j) => (
@@ -120,7 +110,7 @@ export default function ClientesAdminPage() {
         </table>
       </div>
 
-      {!loading && totalPages > 1 && (
+      {!isLoading && totalPages > 1 && (
         <div className="mt-4 flex items-center justify-between text-sm">
           <span className="text-gray-600">Página {page} de {totalPages} ({total} clientes)</span>
           <div className="flex gap-2">

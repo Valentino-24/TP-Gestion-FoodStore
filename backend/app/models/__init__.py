@@ -14,6 +14,7 @@ from app.models.direccion import Direccion
 from app.models.pedido import Pedido
 from app.models.pedido_item import PedidoItem
 from app.models.pago import Pago
+from app.models.historial_estado import HistorialEstado
 
 __all__ = [
     "SQLModel",
@@ -30,4 +31,5 @@ __all__ = [
     "Pedido",
     "PedidoItem",
     "Pago",
+    "HistorialEstado",
 ]

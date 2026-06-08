@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import apiClient from '@/lib/apiClient'
 
 // ── Types ──────────────────────────────────────────────────────
@@ -18,6 +19,7 @@ interface ProductoListResponse {
   total: number
   page: number
   size: number
+  pages: number
 }
 
 interface Categoria {
@@ -41,63 +43,82 @@ const emptyForm: ProductoFormData = {
   imagen_url: '',
 }
 
+// ── Query keys ──────────────────────────────────────────────────
+
+const adminProductoKeys = {
+  list: (page: number, size: number) => ['admin', 'productos', { page, size }] as const,
+}
+
 // ── Component ──────────────────────────────────────────────────
 
 export default function ProductosAdminPage() {
-  const [productos, setProductos] = useState<Producto[]>([])
-  const [categorias, setCategorias] = useState<Categoria[]>([])
-  const [total, setTotal] = useState(0)
+  const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [form, setForm] = useState<ProductoFormData>(emptyForm)
-  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const size = 20
 
-  useEffect(() => {
-    loadCategories()
-  }, [])
-
-  useEffect(() => {
-    loadProducts()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page])
-
-  async function loadCategories() {
-    try {
-      const { data } = await apiClient.get<Categoria[]>('/categorias/')
-      setCategorias(data)
-    } catch {
-      // Silently fail — categories are non-critical for editing
-    }
-  }
-
-  async function loadProducts() {
-    setLoading(true)
-    setError(null)
-    try {
+  const { data: productosData, isLoading: loading } = useQuery({
+    queryKey: adminProductoKeys.list(page, size),
+    queryFn: async () => {
       const { data } = await apiClient.get<ProductoListResponse>('/productos/', {
         params: { page, size },
       })
-      setProductos(data.items)
-      setTotal(data.total)
-    } catch {
-      setError('Error al cargar productos')
-    } finally {
-      setLoading(false)
-    }
-  }
+      return data
+    },
+  })
+
+  const { data: categorias } = useQuery({
+    queryKey: ['categorias'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<Categoria[]>('/categorias/')
+      return data
+    },
+  })
+
+  const productos = productosData?.items ?? []
+  const total = productosData?.total ?? 0
+
+  const createMutation = useMutation({
+    mutationFn: async (payload: Record<string, unknown>) => {
+      const { data } = await apiClient.post<Producto>('/productos/', payload)
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'productos'] })
+    },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, ...payload }: Record<string, unknown> & { id: number }) => {
+      const { data } = await apiClient.put<Producto>(`/productos/${id}`, payload)
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'productos'] })
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiClient.delete(`/productos/${id}`)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'productos'] })
+    },
+  })
 
   function getCategoriaNombre(id: number): string {
-    return categorias.find((c) => c.id === id)?.nombre ?? `Cat. ${id}`
+    return categorias?.find((c) => c.id === id)?.nombre ?? `Cat. ${id}`
   }
 
   function openCreate() {
     setEditingId(null)
     setForm(emptyForm)
+    setError(null)
     setShowModal(true)
   }
 
@@ -110,12 +131,13 @@ export default function ProductosAdminPage() {
       categoria_id: String(p.categoria_id),
       imagen_url: p.imagen_url ?? '',
     })
+    setError(null)
     setShowModal(true)
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    setSaving(true)
+    setError(null)
     try {
       const payload = {
         nombre: form.nombre,
@@ -126,29 +148,25 @@ export default function ProductosAdminPage() {
       }
 
       if (editingId) {
-        await apiClient.put(`/productos/${editingId}`, payload)
+        await updateMutation.mutateAsync({ id: editingId, ...payload })
       } else {
-        await apiClient.post('/productos/', payload)
+        await createMutation.mutateAsync(payload)
       }
 
       setShowModal(false)
-      await loadProducts()
     } catch (err: unknown) {
       const msg =
         err && typeof err === 'object' && 'response' in err
           ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Error al guardar'
           : 'Error de conexión'
       setError(msg)
-    } finally {
-      setSaving(false)
     }
   }
 
   async function handleDelete(id: number) {
     if (!confirm('¿Eliminar este producto?')) return
     try {
-      await apiClient.delete(`/productos/${id}`)
-      await loadProducts()
+      await deleteMutation.mutateAsync(id)
     } catch {
       setError('Error al eliminar el producto')
     }
@@ -204,7 +222,7 @@ export default function ProductosAdminPage() {
               productos.map((p) => (
                 <tr key={p.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">{p.nombre}</td>
-                  <td className="px-4 py-3 text-gray-700">${p.precio.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-gray-700">${Number(p.precio).toFixed(2)}</td>
                   <td className="px-4 py-3 text-gray-600">{getCategoriaNombre(p.categoria_id)}</td>
                   <td className="px-4 py-3">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${p.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
@@ -301,7 +319,7 @@ export default function ProductosAdminPage() {
                     onChange={(e) => setForm((f) => ({ ...f, categoria_id: e.target.value }))}
                   >
                     <option value="">Seleccionar...</option>
-                    {categorias.map((c) => (
+                    {(categorias ?? []).map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.nombre}
                       </option>
@@ -328,10 +346,10 @@ export default function ProductosAdminPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={createMutation.isPending || updateMutation.isPending}
                   className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {saving ? 'Guardando...' : editingId ? 'Actualizar' : 'Crear'}
+                  {(createMutation.isPending || updateMutation.isPending) ? 'Guardando...' : editingId ? 'Actualizar' : 'Crear'}
                 </button>
               </div>
             </form>

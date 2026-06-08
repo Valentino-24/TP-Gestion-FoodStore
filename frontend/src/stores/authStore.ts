@@ -1,10 +1,12 @@
+/**
+ * Auth store — manages authentication state.
+ *
+ * Tokens are managed as httpOnly cookies by the backend.
+ * The store only tracks the authenticated user and UI state.
+ */
+
 import { create } from 'zustand'
-import apiClient, {
-  clearTokens,
-  storeTokens,
-  getStoredAccessToken,
-  getStoredRefreshToken,
-} from '@/lib/apiClient'
+import apiClient from '@/lib/apiClient'
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -28,17 +30,8 @@ interface RegisterPayload {
   password: string
 }
 
-interface AuthResponse {
-  access_token: string
-  refresh_token: string
-  token_type: string
-  expires_in: number
-}
-
 interface AuthState {
   user: User | null
-  accessToken: string | null
-  refreshToken: string | null
   isAuthenticated: boolean
   isLoading: boolean
   error: string | null
@@ -53,8 +46,6 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
-  accessToken: null,
-  refreshToken: null,
   isAuthenticated: false,
   isLoading: false,
   error: null,
@@ -64,15 +55,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   login: async (payload: LoginPayload) => {
     set({ isLoading: true, error: null })
     try {
-      const { data } = await apiClient.post<AuthResponse>('/auth/login', payload)
-      storeTokens(data.access_token, data.refresh_token)
-      set({
-        accessToken: data.access_token,
-        refreshToken: data.refresh_token,
-        isAuthenticated: true,
-        isLoading: false,
-      })
-      // Fetch user data after login
+      await apiClient.post('/auth/login', payload)
+      // Cookies are set automatically by the backend
       await get().hydrate()
     } catch (err: unknown) {
       const message = extractErrorMessage(err)
@@ -84,15 +68,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   register: async (payload: RegisterPayload) => {
     set({ isLoading: true, error: null })
     try {
-      const { data } = await apiClient.post<AuthResponse>('/auth/register', payload)
-      storeTokens(data.access_token, data.refresh_token)
-      set({
-        accessToken: data.access_token,
-        refreshToken: data.refresh_token,
-        isAuthenticated: true,
-        isLoading: false,
-      })
-      // Fetch user data after registration
+      await apiClient.post('/auth/register', payload)
+      // Cookies are set automatically by the backend
       await get().hydrate()
     } catch (err: unknown) {
       const message = extractErrorMessage(err)
@@ -102,19 +79,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
-    const refreshToken = get().refreshToken ?? getStoredRefreshToken()
     try {
-      if (refreshToken) {
-        await apiClient.post('/auth/logout', { refresh_token: refreshToken })
-      }
+      await apiClient.post('/auth/logout')
     } catch {
-      // Ignore errors — we clear local state regardless
+      // Ignore errors — cookies are cleared regardless
     }
-    clearTokens()
     set({
       user: null,
-      accessToken: null,
-      refreshToken: null,
       isAuthenticated: false,
       isLoading: false,
       error: null,
@@ -123,29 +94,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   hydrate: async () => {
-    const token = getStoredAccessToken()
-    if (!token) {
-      set({ isAuthenticated: false, user: null, isLoading: false })
-      return
-    }
-
     set({ isLoading: true })
     try {
       const { data } = await apiClient.get<User>('/auth/me')
       set({
         user: data,
-        accessToken: token,
-        refreshToken: getStoredRefreshToken(),
         isAuthenticated: true,
         isLoading: false,
       })
     } catch {
-      // Token invalid or expired — try refresh or force login
-      clearTokens()
       set({
         user: null,
-        accessToken: null,
-        refreshToken: null,
         isAuthenticated: false,
         isLoading: false,
       })

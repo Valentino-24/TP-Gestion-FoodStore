@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import apiClient from '@/lib/apiClient'
 import { useMercadoPago } from '@/hooks/useMercadoPago'
+import { usePedido } from '@/entities/pedido/usePedidos'
+import { usePaymentStore } from '@/stores/paymentStore'
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -11,54 +13,23 @@ interface PagoResponse {
   monto: number
   metodo: string
   estado: string
+  mp_pago_id?: string
+  mp_status?: string
 }
-
-interface PedidoResponse {
-  id: number
-  total: number
-  estado: string
-  items: Array<{ id: number; producto_nombre: string; cantidad: number; precio_unitario: number; subtotal: number }>
-}
-
-type PaymentState = 'idle' | 'processing' | 'success' | 'error'
 
 // ── Component ──────────────────────────────────────────────────
 
 export default function PaymentPage() {
   const { pedidoId } = useParams<{ pedidoId: string }>()
-  const [pedido, setPedido] = useState<PedidoResponse | null>(null)
   const [pago, setPago] = useState<PagoResponse | null>(null)
-  const [paymentState, setPaymentState] = useState<PaymentState>('idle')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  // Card form fields
   const [cardNumber, setCardNumber] = useState('')
   const [cardExpiry, setCardExpiry] = useState('')
   const [cardCvv, setCardCvv] = useState('')
   const [cardName, setCardName] = useState('')
 
   const { createCardToken, status: mpStatus } = useMercadoPago()
-
-  // Load pedido info on mount
-  useEffect(() => {
-    if (!pedidoId) return
-    let cancelled = false
-
-    apiClient
-      .get<PedidoResponse>(`/pedidos/${pedidoId}`)
-      .then(({ data }) => {
-        if (!cancelled) setPedido(data)
-      })
-      .catch(() => {
-        if (!cancelled) setError('No se pudo cargar la información del pedido')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-
-    return () => { cancelled = true }
-  }, [pedidoId])
+  const { data: pedido, isLoading } = usePedido(Number(pedidoId))
+  const { status: paymentState, errorDetail, setPaymentStatus, setMpPaymentId, setErrorDetail, resetPayment } = usePaymentStore()
 
   // Format card number with spaces
   function handleCardNumberChange(value: string) {
@@ -82,8 +53,8 @@ export default function PaymentPage() {
   async function handlePay() {
     if (!pedidoId || !pedido) return
 
-    setError(null)
-    setPaymentState('processing')
+    setErrorDetail(null)
+    setPaymentStatus('processing')
 
     try {
       // Parse expiry (accepts MM/YY or MM/YYYY)
@@ -111,31 +82,34 @@ export default function PaymentPage() {
 
       setPago(data)
 
+      if (data.mp_pago_id) {
+        setMpPaymentId(data.mp_pago_id)
+      }
+
       if (data.estado === 'aprobado') {
-        setPaymentState('success')
-        const pedidoRes = await apiClient.get<PedidoResponse>(`/pedidos/${pedidoId}`)
-        setPedido(pedidoRes.data)
+        setPaymentStatus('success')
+        // Pedido data already in cache via usePedido hook
       } else {
-        setPaymentState('error')
-        setError(
+        setPaymentStatus('error')
+        setErrorDetail(
           data.mp_status === 'rejected'
             ? 'El pago fue rechazado. Verificá los datos de la tarjeta e intentá de nuevo.'
             : 'Error al procesar el pago',
         )
       }
     } catch (err: unknown) {
-      setPaymentState('error')
+      setPaymentStatus('error')
       const msg =
         err && typeof err === 'object' && 'message' in err
           ? (err as { message: string }).message
           : 'Error al procesar el pago'
-      setError(msg)
+      setErrorDetail(msg)
     }
   }
 
   // ── Render ───────────────────────────────────────────────────
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
@@ -278,7 +252,7 @@ export default function PaymentPage() {
                 </div>
               </div>
 
-              {error && <p className="text-sm text-red-600">{error}</p>}
+              {errorDetail && <p className="text-sm text-red-600">{errorDetail}</p>}
 
               <button
                 type="submit"
@@ -327,9 +301,9 @@ export default function PaymentPage() {
         <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-6 text-center shadow-sm">
           <span className="mb-2 inline-block text-4xl">❌</span>
           <h2 className="text-lg font-semibold text-red-800">Error en el pago</h2>
-          {error && <p className="mt-1 text-sm text-red-700">{error}</p>}
+          {errorDetail && <p className="mt-1 text-sm text-red-700">{errorDetail}</p>}
           <button
-            onClick={() => { setPaymentState('idle'); setError(null) }}
+            onClick={() => { resetPayment() }}
             className="mt-4 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
           >
             Reintentar

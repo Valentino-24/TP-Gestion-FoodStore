@@ -2,42 +2,59 @@
 
 from typing import Annotated, AsyncGenerator, Optional
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
+from app.core.cookies import ACCESS_TOKEN_COOKIE
 from app.database import AsyncSession, async_session_maker, get_db
 from app.models.usuario import Usuario
 
 
-# OAuth2 scheme
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_PREFIX}/auth/login")
+# OAuth2 scheme (kept for backward compatibility during transition)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_PREFIX}/auth/login", auto_error=False)
 
 
 async def get_current_user(
-    token: Annotated[str, Depends(oauth2_scheme)],
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> Usuario:
-    """Decode JWT and return the authenticated user with roles.
+    """Resolve the authenticated user from the request.
+
+    Token resolution order:
+      1. httpOnly cookie ``access_token``
+      2. ``Authorization: Bearer <token>`` header (legacy)
 
     Args:
-        token: JWT token from Authorization header.
+        request: Incoming request (used to read cookies + fallback header).
         db: Database session.
 
     Returns:
         Usuario object with roles loaded.
 
     Raises:
-        HTTPException 401 if token is invalid or user not found.
+        HTTPException 401 if no valid token is found.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="No se pudo validar las credenciales",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    # 1. Try httpOnly cookie first
+    token = request.cookies.get(ACCESS_TOKEN_COOKIE)
+
+    # 2. Fallback: Authorization header (legacy / Swagger UI)
+    if not token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+
+    if not token:
+        raise credentials_exception
 
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
